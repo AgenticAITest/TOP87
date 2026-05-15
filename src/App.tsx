@@ -27,6 +27,7 @@ import AdminCMS     from './pages/admin/AdminCMS';
 import SiteAdmin    from './pages/admin/SiteAdmin';
 import ContentAdmin from './pages/admin/ContentAdmin';
 import AllMembers   from './pages/admin/AllMembers';
+import AdminRoles   from './pages/admin/AdminRoles';
 
 export default function App() {
   return (
@@ -63,6 +64,7 @@ export default function App() {
           <Route path="site"        element={<SiteAdmin />} />
           <Route path="content"     element={<ContentAdmin />} />
           <Route path="all-members" element={<AllMembers />} />
+          <Route path="roles"       element={<AdminRoles />} />
           <Route path="*"          element={<Navigate to="/admin" replace />} />
         </Route>
 

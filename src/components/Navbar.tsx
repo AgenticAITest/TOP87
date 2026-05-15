@@ -3,6 +3,7 @@ import { Menu, X, LogOut, User, ShieldCheck, Upload, BookOpen, ChevronDown } fro
 import { useState, useRef, useEffect, RefObject } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useAdminStatus } from '../hooks/useAdminStatus';
 
 const navLinks = [
   { label: 'Directory', to: '/directory' },
@@ -28,6 +29,7 @@ function useOutsideClick(ref: RefObject<HTMLDivElement | null>, onClose: () => v
 
 export default function Navbar() {
   const { user, profile, loading, signInWithGoogle, signOut } = useAuth();
+  const { isAdmin } = useAdminStatus();
   const [isOpen,        setIsOpen]        = useState(false);
   const [dropdownOpen,  setDropdown]      = useState(false);
   const [yearbookOpen,  setYearbookOpen]  = useState(false);
@@ -141,7 +143,7 @@ export default function Navbar() {
                         <Upload size={14} /> Submit Media
                       </Link>
                     )}
-                    {(profile?.is_super_admin || false) && (
+                    {isAdmin && (
                       <Link to="/admin" onClick={() => setDropdown(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-gold hover:bg-gold/5 transition-colors">
                         <ShieldCheck size={14} /> Admin Panel
