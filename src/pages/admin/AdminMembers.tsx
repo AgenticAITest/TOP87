@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Search, Check, X, ShieldOff, RotateCcw, MapPin } from 'lucide-react';
+import { Search, Check, X, ShieldOff, RotateCcw, MapPin, ShieldCheck } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
@@ -133,6 +134,13 @@ export default function AdminMembers() {
                 {member.status}
               </span>
               <div className="flex gap-1.5 shrink-0">
+                {isSuperAdmin && member.status === 'approved' && (
+                  <Link to={`/admin/roles?q=${encodeURIComponent(member.name ?? '')}`}
+                    title="Manage admin role"
+                    className="p-1.5 rounded-lg bg-gold/10 text-gold/70 hover:bg-gold/20 hover:text-gold transition-all">
+                    <ShieldCheck size={14} />
+                  </Link>
+                )}
                 {member.status === 'pending' && (
                   <>
                     <button onClick={() => actionMutation.mutate({ memberId: member.id, newStatus: 'approved' })}

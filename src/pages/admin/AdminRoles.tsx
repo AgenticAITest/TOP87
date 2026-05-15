@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, ShieldCheck, UserPlus, X, Loader, ChevronDown } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
@@ -66,8 +66,9 @@ export default function AdminRoles() {
   const { user }                            = useAuth();
   const { isSuperAdmin, loading: roleLoad } = useAdminStatus();
   const queryClient                         = useQueryClient();
+  const [searchParams]                      = useSearchParams();
 
-  const [search, setSearch]       = useState('');
+  const [search, setSearch]       = useState(() => searchParams.get('q') ?? '');
   const [expandedId, setExpanded] = useState<string | null>(null);
 
   const { data: admins,  isLoading: adminsLoading }   = useQuery({ queryKey: ['admin', 'roles'],         queryFn: fetchAdmins });
