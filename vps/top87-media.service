@@ -1,0 +1,18 @@
+[Unit]
+Description=TOP87 Media Upload Server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/top87-media
+ExecStart=/usr/bin/node server.js
+EnvironmentFile=/opt/top87-media/.env
+Restart=on-failure
+RestartSec=5
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=top87-media
+
+[Install]
+WantedBy=multi-user.target
