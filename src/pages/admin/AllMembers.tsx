@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Search, Check, X, ShieldOff, RotateCcw, MapPin } from 'lucide-react';
+import { Search, Check, X, ShieldOff, RotateCcw, MapPin, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { fetchCharters } from '../../lib/queries';
+import { fetchCharters, qk } from '../../lib/queries';
 
 async function fetchAllMembersAdmin() {
   const { data, error } = await supabase
@@ -72,6 +72,7 @@ export default function AllMembers() {
   const [status, setStatus]       = useState<Status>('all');
   const [charterId, setCharterId] = useState('');
   const [attendance, setAttendance] = useState<AttendanceFilter>('all');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const { data: members = [], isLoading } = useQuery({
     queryKey: ['admin', 'all-members'],
@@ -118,6 +119,22 @@ export default function AllMembers() {
       });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin'] }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (memberId: string) => {
+      await supabase.from('audit_log').insert({
+        action: 'member_deleted', actor_id: user!.id, target_id: memberId,
+        details: { reason: 'admin_delete' },
+      });
+      const { error } = await supabase.from('profiles').delete().eq('id', memberId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setConfirmDeleteId(null);
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
+      queryClient.invalidateQueries({ queryKey: qk.members() });
+    },
   });
 
   return (
@@ -197,7 +214,9 @@ export default function AllMembers() {
             <motion.div key={member.id}
               initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
               transition={{ delay: Math.min(i * 0.015, 0.25) }}
-              className="glass flex items-center gap-4 p-4 rounded-xl hover:border-white/10 transition-colors">
+              className={`glass flex items-center gap-4 p-4 rounded-xl transition-colors ${
+                confirmDeleteId === member.id ? 'border border-red-500/30' : 'hover:border-white/10'
+              }`}>
 
               {member.avatar_url ? (
                 <img src={member.avatar_url} alt={member.name ?? ''} referrerPolicy="no-referrer"
@@ -210,66 +229,89 @@ export default function AllMembers() {
 
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-white truncate">{member.name ?? '—'}</p>
-                <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                  {member.allCharters.length > 0
-                    ? member.allCharters.map((c, idx) => (
-                        <span key={idx}
-                          className={`text-xs ${idx === 0 ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {c}
-                        </span>
-                      ))
-                    : <span className="text-xs text-gray-700 italic">No charter</span>
-                  }
-                  {member.city && (
-                    <span className="text-xs text-gray-600 flex items-center gap-0.5">
-                      <MapPin size={9} />{member.city}
+                {confirmDeleteId === member.id ? (
+                  <p className="text-xs text-red-400">Delete this member? This cannot be undone.</p>
+                ) : (
+                  <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                    {member.allCharters.length > 0
+                      ? member.allCharters.map((c, idx) => (
+                          <span key={idx} className={`text-xs ${idx === 0 ? 'text-gray-400' : 'text-gray-600'}`}>{c}</span>
+                        ))
+                      : <span className="text-xs text-gray-700 italic">No charter</span>
+                    }
+                    {member.city && (
+                      <span className="text-xs text-gray-600 flex items-center gap-0.5">
+                        <MapPin size={9} />{member.city}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {confirmDeleteId === member.id ? (
+                <div className="flex gap-2 shrink-0 ml-auto">
+                  <button onClick={() => deleteMutation.mutate(member.id)}
+                    disabled={deleteMutation.isPending}
+                    className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-xs font-bold uppercase tracking-wider hover:bg-red-600 transition-all disabled:opacity-50">
+                    {deleteMutation.isPending ? 'Deleting…' : 'Yes, delete'}
+                  </button>
+                  <button onClick={() => setConfirmDeleteId(null)}
+                    disabled={deleteMutation.isPending}
+                    className="px-3 py-1.5 rounded-lg bg-white/10 text-gray-300 text-xs font-bold uppercase tracking-wider hover:bg-white/20 transition-all">
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span className="text-[10px] text-gray-600 shrink-0 hidden md:block">
+                    {timeAgo(member.created_at)}
+                  </span>
+
+                  {member.reunion_attendance && (
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 hidden lg:inline ${ATTENDANCE_COLORS[member.reunion_attendance] ?? 'text-gray-400'}`}>
+                      {ATTENDANCE_LABELS[member.reunion_attendance] ?? member.reunion_attendance}
                     </span>
                   )}
-                </div>
-              </div>
 
-              <span className="text-[10px] text-gray-600 shrink-0 hidden md:block">
-                {timeAgo(member.created_at)}
-              </span>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${STATUS_COLORS[member.status] ?? 'text-gray-400'}`}>
+                    {member.status}
+                  </span>
 
-              {member.reunion_attendance && (
-                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 hidden lg:inline ${ATTENDANCE_COLORS[member.reunion_attendance] ?? 'text-gray-400'}`}>
-                  {ATTENDANCE_LABELS[member.reunion_attendance] ?? member.reunion_attendance}
-                </span>
+                  <div className="flex gap-1.5 shrink-0">
+                    {member.status === 'pending' && (<>
+                      <button onClick={() => actionMutation.mutate({ memberId: member.id, newStatus: 'approved' })}
+                        disabled={actionMutation.isPending} title="Approve"
+                        className="p-1.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500 hover:text-white transition-all disabled:opacity-40">
+                        <Check size={14} />
+                      </button>
+                      <button onClick={() => actionMutation.mutate({ memberId: member.id, newStatus: 'rejected' })}
+                        disabled={actionMutation.isPending} title="Reject"
+                        className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all disabled:opacity-40">
+                        <X size={14} />
+                      </button>
+                    </>)}
+                    {member.status === 'approved' && (
+                      <button onClick={() => actionMutation.mutate({ memberId: member.id, newStatus: 'suspended' })}
+                        disabled={actionMutation.isPending} title="Suspend"
+                        className="p-1.5 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white transition-all disabled:opacity-40">
+                        <ShieldOff size={14} />
+                      </button>
+                    )}
+                    {(member.status === 'suspended' || member.status === 'rejected') && (
+                      <button onClick={() => actionMutation.mutate({ memberId: member.id, newStatus: 'approved' })}
+                        disabled={actionMutation.isPending} title="Restore"
+                        className="p-1.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500 hover:text-white transition-all disabled:opacity-40">
+                        <RotateCcw size={14} />
+                      </button>
+                    )}
+                    <button onClick={() => setConfirmDeleteId(member.id)}
+                      title="Delete member"
+                      className="p-1.5 rounded-lg bg-red-500/10 text-red-400/60 hover:bg-red-500/20 hover:text-red-400 transition-all">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </>
               )}
-
-              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${STATUS_COLORS[member.status] ?? 'text-gray-400'}`}>
-                {member.status}
-              </span>
-
-              <div className="flex gap-1.5 shrink-0">
-                {member.status === 'pending' && (<>
-                  <button onClick={() => actionMutation.mutate({ memberId: member.id, newStatus: 'approved' })}
-                    disabled={actionMutation.isPending} title="Approve"
-                    className="p-1.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500 hover:text-white transition-all disabled:opacity-40">
-                    <Check size={14} />
-                  </button>
-                  <button onClick={() => actionMutation.mutate({ memberId: member.id, newStatus: 'rejected' })}
-                    disabled={actionMutation.isPending} title="Reject"
-                    className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all disabled:opacity-40">
-                    <X size={14} />
-                  </button>
-                </>)}
-                {member.status === 'approved' && (
-                  <button onClick={() => actionMutation.mutate({ memberId: member.id, newStatus: 'suspended' })}
-                    disabled={actionMutation.isPending} title="Suspend"
-                    className="p-1.5 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white transition-all disabled:opacity-40">
-                    <ShieldOff size={14} />
-                  </button>
-                )}
-                {(member.status === 'suspended' || member.status === 'rejected') && (
-                  <button onClick={() => actionMutation.mutate({ memberId: member.id, newStatus: 'approved' })}
-                    disabled={actionMutation.isPending} title="Restore"
-                    className="p-1.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500 hover:text-white transition-all disabled:opacity-40">
-                    <RotateCcw size={14} />
-                  </button>
-                )}
-              </div>
             </motion.div>
           ))}
         </div>
