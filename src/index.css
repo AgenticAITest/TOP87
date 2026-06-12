@@ -1,36 +1,90 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-serif: "Playfair Display", serif;
+  --font-serif: "Crimson Pro", serif;
   --font-sans: "Inter", sans-serif;
-  
-  --color-navy: #0A192F;
-  --color-charcoal: #111111;
+
   --color-gold: #D4AF37;
   --color-gold-light: #F9E27D;
+  --color-forest: #0d2b1f;
+  --color-parchment: #f4efdf;
+  --color-parchment-dark: #ede8d5;
+
+  /* Kept for admin panel backward-compat */
+  --color-charcoal: #111111;
+  --color-navy: #0A192F;
 }
 
 @layer base {
   body {
-    @apply bg-charcoal text-gray-200 font-sans antialiased;
+    @apply bg-parchment text-gray-800 font-sans antialiased;
   }
-  
+
   h1, h2, h3, h4, h5, h6 {
     @apply font-serif;
   }
 }
 
 @layer components {
+  /* ── Sidebar ─────────────────────────────────────────── */
+  .sidebar-bg {
+    background-color: #0d2b1f;
+    background-image: radial-gradient(circle at 50% 50%, rgba(20, 50, 40, 0.8) 0%, rgba(13, 43, 31, 1) 100%);
+    position: relative;
+  }
+  .sidebar-bg::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0.05;
+    pointer-events: none;
+    background-image: url('https://www.transparenttextures.com/patterns/dark-leather.png');
+  }
+
+  /* ── Page backgrounds ─────────────────────────────────── */
+  .parchment-bg {
+    background-color: #f4efdf;
+    background-image: url('https://www.transparenttextures.com/patterns/paper-fibers.png');
+    background-attachment: fixed;
+  }
+
+  /* ── Cards ────────────────────────────────────────────── */
+  .glass-card {
+    background: rgba(248, 244, 236, 0.85);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(212, 175, 55, 0.15);
+  }
+
+  /* Legacy aliases kept for admin panel pages */
   .glass {
     @apply bg-white/5 backdrop-blur-md border border-white/10;
   }
-  
   .glass-gold {
     @apply bg-gold/5 backdrop-blur-md border border-gold/20;
   }
-
   .gold-glow {
     text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+  }
+
+  /* ── Buttons ──────────────────────────────────────────── */
+  .btn-primary {
+    background: linear-gradient(to right, #c67119, #a35a12);
+    color: white;
+    transition: background 0.3s ease;
+    cursor: pointer;
+  }
+  .btn-primary:hover {
+    background: linear-gradient(to right, #a35a12, #8a4a0d);
+  }
+
+  .btn-secondary {
+    background-color: #0d2b1f;
+    color: white;
+    transition: background 0.3s ease;
+    cursor: pointer;
+  }
+  .btn-secondary:hover {
+    background-color: #1a4a35;
   }
 }

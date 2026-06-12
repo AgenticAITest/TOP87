@@ -4,111 +4,103 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Class of '87 Reunion Portal** - A sophisticated alumni reunion website for the Class of 1987. This is a React 19 + Vite + TypeScript application deployed as a Google AI Studio app, featuring a dark luxury aesthetic with regional charter chapters and an admin dashboard.
-
-### Key Features
-- Alumni member directory with approval workflow
-- Regional chapter management (Jakarta, Bandung, US, Australia)
-- Admin dashboard for verification queue and system logs
-- Responsive design with glassmorphism UI components
-- Gemini AI integration via Google's genai SDK
-- Motion graphics and smooth animations
-
-## Tech Stack
-
-- **Frontend Framework**: React 19.0.1 with TypeScript 5.8
-- **Build Tool**: Vite 6.2.3
-- **Styling**: Tailwind CSS 4.1.14 (via @tailwindcss/vite plugin)
-- **Animation**: Motion/Framer Motion 12.23.24
-- **Icons**: Lucide React 0.546.0
-- **Server**: Express 4.21.2
-- **AI Integration**: Google Generative AI SDK (@google/genai 1.29.0)
-- **Environment**: Node.js required
+**Class of '87 Reunion Portal** — Alumni reunion website for the Class of 1987 (SMA Negeri 3 Bandung). React 19 + Vite + TypeScript SPA with Supabase for auth, database, and storage. Dark luxury aesthetic with glassmorphism UI.
 
 ## Development Commands
 
 ```bash
-npm install                    # Install dependencies
-npm run dev                    # Start Vite dev server on port 3000 (0.0.0.0 for network access)
-npm run build                  # Build for production (output: dist/)
-npm run preview                # Preview production build locally
-npm run clean                  # Remove dist/ directory
-npm run lint                   # Type-check TypeScript (tsc --noEmit)
+npm install          # Install dependencies
+npm run dev          # Vite dev server on port 3000 (0.0.0.0 for network)
+npm run build        # Production build → dist/
+npm run preview      # Preview production build
+npm run lint         # TypeScript type-check (tsc --noEmit)
+npm run clean        # Remove dist/
 ```
 
 ### Environment Setup
 
-1. Create a `.env.local` file (copy from `.env.example`)
-2. Set `GEMINI_API_KEY` to your Gemini API key
-3. (Optional) Set `APP_URL` for the hosted app URL
-
-The app automatically injects both at runtime when deployed to AI Studio.
-
-## Project Structure
-
+Create `.env.local` with:
 ```
-src/
-├── main.tsx              # React root entry point
-├── App.tsx               # Main layout component (navbar, sections, footer)
-├── index.css             # Global styles with Tailwind + custom themes
-└── components/
-    ├── Navbar.tsx        # Fixed header with mobile menu toggle
-    ├── Hero.tsx          # Landing section with Google sign-in CTA
-    ├── CharterSpotlight.tsx  # Regional chapter cards (4 charters)
-    ├── MemberDirectory.tsx   # Alumni grid with status badges
-    └── AdminDashboard.tsx    # Admin stats, verification queue, system log
+GEMINI_API_KEY=...
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
 ```
 
-## Architecture & Patterns
+`GEMINI_API_KEY` is injected at build time via `process.env` (Vite `define`). Supabase vars use the standard `import.meta.env.VITE_*` prefix and are read at runtime in `src/lib/supabase.ts`.
 
-### Component Structure
-- **Functional Components**: All components use React hooks (useState for mobile menu toggle)
-- **Layout**: Single-page scroll experience with section-based organization
-- **Styling**: Utility-first Tailwind CSS with custom theme colors defined in `index.css`
+## Architecture
 
-### Custom Color System
-Defined as CSS custom properties in `index.css`:
-- `--color-charcoal`: #111111 (primary background)
-- `--color-navy`: #0A192F (secondary background)
-- `--color-gold`: #D4AF37 (accent/highlight)
-- `--color-gold-light`: #F9E27D (lighter accent)
+### Routing & Layouts
 
-### Reusable Utilities
-Three custom Tailwind component classes in `index.css`:
-- `.glass`: Glassmorphism effect (semi-transparent white background with blur)
-- `.glass-gold`: Gold variant of the glass effect
-- `.gold-glow`: Text shadow for gold accent text
+`App.tsx` uses React Router v7 with two layouts:
+- **`MainLayout`** — public + member pages, wraps the navbar/footer shell
+- **`AdminLayout`** — fixed sidebar, checks `useAdminStatus()` and redirects non-admins to `/`
 
-### Animations & Motion
-- Uses Motion library for entrance animations
-- Components use `initial`, `animate`, `whileInView`, `whileHover`, `whileTap` props
-- Staggered animations on list items using `delay: index * 0.05/0.1`
-- Viewport-triggered animations (appears when scrolled into view)
+Route access tiers enforced by `ProtectedRoute`:
+1. **Public** — `/`, `/about`, `/charters`, `/charters/:slug`, `/yearbook/:year`
+2. **Authenticated (any status)** — `/register`, `/pending`, `/profile`
+3. **Approved members only** (`requireApproved`) — `/directory`, `/gallery`, `/submit`, `/members/:id`
+4. **Admin** — `/admin/*` (checked in `AdminLayout` via `useAdminStatus`)
 
-### Data Patterns
-- **Hard-coded Data**: Member profiles and charter data are inline arrays in component files
-  - `MemberDirectory.tsx`: 6 sample members with status (Approved/Pending/Suspended)
-  - `CharterSpotlight.tsx`: 4 regional chapters with stats and descriptions
-  - `AdminDashboard.tsx`: Sample stats, verification requests, system logs
-- No backend API integration yet; these would be replaced with API calls or state management
+Auth flow: Google OAuth via Supabase → `/auth/callback` → `/register` (fill profile) → `status='pending'` → admin approves → `status='approved'`.
+
+### Auth & Profiles
+
+`AuthContext` (`src/contexts/AuthContext.tsx`) is the single source of truth:
+- `user` — Supabase `User` (JWT identity)
+- `profile` — `profiles` table row: `{ id, name, phone, bio, avatar_url, city, profession, status, is_super_admin }`
+- `loading` — true until `getSession()` resolves (hard 6s fallback timeout)
+- Auth state changes skip `INITIAL_SESSION` and `TOKEN_REFRESHED` to avoid flash/race
+
+`useAdminStatus()` (`src/hooks/useAdminStatus.ts`) extends auth with:
+- `isSuperAdmin` — from `profile.is_super_admin`
+- `isAdmin` — super admin OR has rows in `charter_admins`
+- `charterIds` — charters this user admins (empty for super admin → they see all)
+
+### Data Layer
+
+All Supabase queries live in `src/lib/queries.ts`. The query key factory `qk` is the single source of truth for TanStack Query cache keys — always use it for `useQuery`/`invalidateQueries`.
+
+Admin queries accept `(isSuperAdmin, charterIds)` and use `charterScope()` to filter by profile IDs when the admin is not super admin.
+
+**Supabase tables:** `profiles`, `charters`, `charter_members`, `charter_admins`, `media`, `site_settings`, `audit_log`
+
+### Storage Abstraction
+
+`src/lib/storage.ts` supports two backends toggled via `site_settings.storage_backend`:
+- **`supabase`** — Supabase Storage bucket `media` (bare path stored)
+- **`vps`** — `https://media.top87.id/api/upload` (full HTTPS URL stored)
+
+`resolveMediaUrl(storagePath)` handles both: full `https://` URLs returned as-is, bare paths resolved via Supabase public URL. Always use this when rendering media.
+
+### Admin RBAC
+
+Two admin tiers with separate nav sections in `AdminLayout`:
+
+| Section | Routes | Who |
+|---------|--------|-----|
+| Charter Admin | `/admin`, `/admin/members`, `/admin/media`, `/admin/cms` | Charter admin + super admin |
+| Super Admin | `/admin/site`, `/admin/content`, `/admin/all-members`, `/admin/roles` | Super admin only |
+
+Charter admins only see members/media belonging to their assigned charters (enforced via `charterScope` in queries and Supabase RLS).
 
 ### Design System
-- **Typography**: Playfair Display (serif) for headings, Inter (sans) for body
-- **Responsive**: Mobile-first with `md:` (768px) and `lg:` (1024px) breakpoints
-- **Icons**: Lucide React for consistent iconography
-- **Images**: External Unsplash URLs with grayscale effects and color transitions
 
-## TypeScript Configuration
+Custom Tailwind classes in `index.css`:
+- `.glass` — glassmorphism (semi-transparent white + blur)
+- `.glass-gold` — gold variant of glass
+- `.gold-glow` — gold text shadow
 
-- **Target**: ES2022
-- **Module Resolution**: bundler (for Vite)
-- **JSX**: react-jsx (automatic JSX transform)
-- **Paths Alias**: `@/*` points to project root
-- **Type Checking**: Run `npm run lint` to validate types without emitting
+CSS custom properties: `--color-charcoal` (#111111), `--color-navy` (#0A192F), `--color-gold` (#D4AF37), `--color-gold-light` (#F9E27D).
 
-## Vite Configuration
+Typography: Playfair Display (headings), Inter (body). Animations via Motion library with `whileInView` + stagger pattern (`delay: index * 0.05`).
 
-- **Plugins**: React (@vitejs/plugin-react) and Tailwind CSS (@tailwindcss/vite)
-- **Env Vars**: `GEMINI_API_KEY` is injected at build time via `process.env`
-- **HMR**: Disabled when `DISABLE_HMR` env var is true (leftover from AI Studio prototyping — can be ignored)
-- **Path Alias**: `@` resolves to project root
+## Planned Features (from `Additional_requriements.txt`)
+
+Not yet implemented — reference before building new features to avoid conflicts:
+- Extended registration fields: nickname, birthdate, WhatsApp, reunion attendance
+- Reunion + donation payments with QRIS and admin reconciliation
+- Merchandise tracking with stock countdowns
+- Daily WhatsApp status updates with budget/registration screenshots
+- Light/dark theme toggle
+- Comments on media posts

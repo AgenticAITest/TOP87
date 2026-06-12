@@ -115,24 +115,24 @@ export default function MyProfile() {
   }[profile.status] ?? 'text-gray-400';
 
   return (
-    <div className="min-h-screen py-32 px-6">
-      <div className="max-w-2xl mx-auto">
-        <span className="text-xs uppercase tracking-[0.3em] text-gold/60 mb-3 block">Account</span>
-        <h1 className="font-serif text-4xl font-bold text-white mb-10">My Profile</h1>
+    <div className="p-6 md:p-8">
+      <div className="max-w-2xl">
+        <span className="text-xs uppercase tracking-[0.3em] text-gold/70 mb-3 block">Account</span>
+        <h1 className="font-serif text-4xl font-bold text-forest mb-8">My Profile</h1>
 
         {/* Identity card */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-6 mb-8 glass p-6 rounded-2xl">
+          className="flex items-center gap-5 mb-6 glass-card p-5 rounded-xl shadow-sm">
           <div className="relative shrink-0 group cursor-pointer" onClick={() => fileRef.current?.click()}>
             {avatarUrl ? (
               <img src={avatarUrl} alt={displayName} referrerPolicy="no-referrer"
-                className="w-20 h-20 rounded-2xl object-cover" />
+                className="w-18 h-18 rounded-xl object-cover" style={{ width: 72, height: 72 }} />
             ) : (
-              <div className="w-20 h-20 rounded-2xl bg-gold/10 flex items-center justify-center">
+              <div className="w-18 h-18 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center" style={{ width: 72, height: 72 }}>
                 <span className="text-3xl font-serif font-bold text-gold">{displayName.charAt(0)}</span>
               </div>
             )}
-            <div className="absolute inset-0 rounded-2xl bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute inset-0 rounded-xl bg-forest/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
               {avatarMutation.isPending
                 ? <Loader size={20} className="text-white animate-spin" />
                 : <Camera size={20} className="text-white" />}
@@ -141,13 +141,13 @@ export default function MyProfile() {
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
 
           <div>
-            <p className="text-white font-semibold text-lg">{displayName}</p>
+            <p className="text-forest font-semibold text-lg">{displayName}</p>
             <p className="text-gray-500 text-sm">{user.email}</p>
             <div className="flex items-center gap-2 mt-2">
               <ShieldCheck size={12} className={statusColor} />
               <span className={`text-xs uppercase tracking-widest capitalize ${statusColor}`}>{profile.status}</span>
             </div>
-            <p className="text-xs text-gray-600 mt-1">Click avatar to change photo</p>
+            <p className="text-xs text-gray-400 mt-1">Click avatar to change photo</p>
           </div>
         </motion.div>
 
@@ -159,15 +159,15 @@ export default function MyProfile() {
 
         {/* Charter memberships */}
         {memberships.length > 0 && (
-          <div className="glass p-6 rounded-2xl mb-8">
-            <p className="text-xs uppercase tracking-widest text-gray-600 mb-4">Charter Membership</p>
+          <div className="glass-card p-5 rounded-xl mb-6 shadow-sm">
+            <p className="text-xs uppercase tracking-widest text-gray-400 mb-4">Charter Membership</p>
             <div className="flex flex-wrap gap-3">
               {memberships.map(m => (
                 <Link key={m.charter_id} to={`/charters/${m.charter.slug}`}
                   className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-colors ${
                     m.is_primary
-                      ? 'bg-gold/10 text-gold border border-gold/20 hover:bg-gold/20'
-                      : 'glass text-gray-400 hover:text-white'
+                      ? 'bg-amber-50 text-gold border border-gold/30 hover:bg-amber-100'
+                      : 'bg-white text-gray-600 border border-amber-200 hover:border-amber-300 hover:text-forest'
                   }`}>
                   {m.charter.name}{m.is_primary ? ' ★' : ''}
                 </Link>
@@ -186,7 +186,7 @@ export default function MyProfile() {
             <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Full Name *</label>
             <input required value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors" />
+              className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors" />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -194,14 +194,14 @@ export default function MyProfile() {
               <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Current City *</label>
               <input required value={form.city}
                 onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+                className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
                 placeholder="e.g. Jakarta" />
             </div>
             <div>
               <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Profession</label>
               <input value={form.profession}
                 onChange={e => setForm(f => ({ ...f, profession: e.target.value }))}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+                className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
                 placeholder="e.g. Architect" />
             </div>
           </div>
@@ -210,7 +210,7 @@ export default function MyProfile() {
             <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Phone / WhatsApp</label>
             <input value={form.phone}
               onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+              className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
               placeholder="+62 812 …" />
           </div>
 
@@ -219,7 +219,7 @@ export default function MyProfile() {
             <textarea value={form.bio}
               onChange={e => setForm(f => ({ ...f, bio: e.target.value }))}
               rows={4}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors resize-none"
+              className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors resize-none"
               placeholder="A few words about yourself…" />
           </div>
 
@@ -229,7 +229,7 @@ export default function MyProfile() {
           {saved && <p className="text-green-400 text-sm">Profile updated.</p>}
 
           <button type="submit" disabled={updateMutation.isPending}
-            className="flex items-center gap-2 bg-gold hover:bg-gold/90 text-charcoal font-bold py-3 px-8 rounded-full transition-all disabled:opacity-50 uppercase tracking-widest text-sm">
+            className="btn-primary flex items-center gap-2 font-bold py-3 px-8 rounded-xl transition-all disabled:opacity-50 uppercase tracking-widest text-sm">
             {updateMutation.isPending ? <Loader size={16} className="animate-spin" /> : <Save size={16} />}
             {updateMutation.isPending ? 'Saving…' : 'Save Changes'}
           </button>

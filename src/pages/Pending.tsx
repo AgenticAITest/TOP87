@@ -34,27 +34,27 @@ export default function Pending() {
   const { icon, label, title, body, color } = config[status] ?? config.pending;
 
   return (
-    <div className="min-h-screen bg-charcoal flex items-center justify-center px-6">
+    <div className="min-h-screen flex items-center justify-center px-6">
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
         className="text-center max-w-lg"
       >
-        <div className={`w-16 h-16 rounded-full border glass ${color} flex items-center justify-center mx-auto mb-8`}>
+        <div className={`w-16 h-16 rounded-full border glass-card ${color} flex items-center justify-center mx-auto mb-8`}>
           {icon}
         </div>
-        <p className="text-xs uppercase tracking-[0.3em] text-gold/60 mb-4">{label}</p>
-        <h1 className="font-serif text-5xl font-bold text-white mb-4">{title}</h1>
-        <p className="text-gray-500 leading-relaxed text-sm">{body}</p>
+        <p className="text-xs uppercase tracking-[0.3em] text-gold/70 mb-4">{label}</p>
+        <h1 className="font-serif text-5xl font-bold text-forest mb-4">{title}</h1>
+        <p className="text-gray-600 leading-relaxed text-sm">{body}</p>
 
         <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-          <Link to="/" className="text-xs uppercase tracking-widest text-gray-600 hover:text-gold transition-colors py-2">
+          <Link to="/" className="text-xs uppercase tracking-widest text-gray-500 hover:text-forest transition-colors py-2">
             ← Back to home
           </Link>
           <button
             onClick={signOut}
-            className="text-xs uppercase tracking-widest text-gray-600 hover:text-red-400 transition-colors py-2"
+            className="text-xs uppercase tracking-widest text-gray-500 hover:text-red-500 transition-colors py-2"
           >
             Sign out
           </button>

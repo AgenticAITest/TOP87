@@ -1,5 +1,5 @@
 import { Outlet, NavLink, Link, Navigate } from 'react-router-dom';
-import { Users, Image, LayoutDashboard, FileText, Globe, ChevronRight, LogOut, BookOpen, ShieldCheck } from 'lucide-react';
+import { Users, Image, LayoutDashboard, FileText, Globe, ChevronRight, LogOut, BookOpen, ShieldCheck, PenSquare } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminStatus } from '../hooks/useAdminStatus';
 
@@ -11,10 +11,11 @@ const adminLinks = [
 ];
 
 const superAdminLinks = [
-  { to: '/admin/site',        label: 'Site CMS',    icon: Globe,        end: false },
-  { to: '/admin/content',     label: 'Content',     icon: BookOpen,     end: false },
-  { to: '/admin/all-members', label: 'All Members', icon: Users,        end: false },
-  { to: '/admin/roles',       label: 'Admin Roles', icon: ShieldCheck,  end: false },
+  { to: '/admin/site',        label: 'Site Settings', icon: Globe,        end: false },
+  { to: '/admin/site-cms',    label: 'Site CMS',      icon: PenSquare,    end: false },
+  { to: '/admin/content',     label: 'Content',       icon: BookOpen,     end: false },
+  { to: '/admin/all-members', label: 'All Members',   icon: Users,        end: false },
+  { to: '/admin/roles',       label: 'Admin Roles',   icon: ShieldCheck,  end: false },
 ];
 
 export default function AdminLayout() {

@@ -1,7 +1,8 @@
 import { useState, useMemo, ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { Check, Loader, HardDrive, Cloud, Shuffle, List, Search, X, Users } from 'lucide-react';
+import { Check, Loader, HardDrive, Cloud, Shuffle, List, Search, X, Users, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../../lib/supabase';
 import { getStorageBackend, setStorageBackend, type StorageBackend } from '../../lib/storage';
 import {
   getFeaturedConfig, setFeaturedConfig,
@@ -26,6 +27,22 @@ const BACKENDS: { id: StorageBackend; label: string; description: string; icon: 
     icon: <HardDrive size={20} />,
   },
 ];
+
+// ─── Feature flags ────────────────────────────────────────────────────────────
+
+interface FeatureFlags { donations: boolean; merchandise: boolean; }
+
+async function getFeatureFlags(): Promise<FeatureFlags> {
+  const { data } = await supabase.from('site_settings').select('value').eq('key', 'feature_flags').single();
+  if (!data?.value) return { donations: false, merchandise: false };
+  try { return JSON.parse(data.value); } catch { return { donations: false, merchandise: false }; }
+}
+
+async function setFeatureFlags(flags: FeatureFlags): Promise<void> {
+  const { error } = await supabase.from('site_settings')
+    .upsert({ key: 'feature_flags', value: JSON.stringify(flags) }, { onConflict: 'key' });
+  if (error) throw error;
+}
 
 // ─── Featured members ─────────────────────────────────────────────────────────
 
@@ -58,6 +75,31 @@ type ApprovedMember = Awaited<ReturnType<typeof fetchApprovedMembers>>[number];
 
 export default function SiteAdmin() {
   const queryClient = useQueryClient();
+
+  // ── Feature flags state ──
+  const [flagsSaved, setFlagsSaved] = useState(false);
+  const { data: currentFlags, isLoading: flagsLoading } = useQuery({
+    queryKey: qk.featureFlags(),
+    queryFn:  getFeatureFlags,
+  });
+  const [localFlags, setLocalFlags] = useState<FeatureFlags | null>(null);
+  const activeFlags = localFlags ?? currentFlags ?? { donations: false, merchandise: false };
+
+  const flagsMutation = useMutation({
+    mutationFn: () => setFeatureFlags(activeFlags),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.featureFlags() });
+      setFlagsSaved(true);
+      setTimeout(() => setFlagsSaved(false), 2000);
+    },
+  });
+
+  const flagsDirty = localFlags !== null &&
+    JSON.stringify(localFlags) !== JSON.stringify(currentFlags ?? { donations: false, merchandise: false });
+
+  function toggleFlag(key: keyof FeatureFlags) {
+    setLocalFlags({ ...activeFlags, [key]: !activeFlags[key] });
+  }
 
   // ── Storage state ──
   const [storageSaved, setStorageSaved] = useState(false);
@@ -150,6 +192,58 @@ export default function SiteAdmin() {
       </div>
 
       <div className="max-w-2xl space-y-8">
+
+        {/* ── Feature Flags ── */}
+        <section className="glass rounded-2xl p-6">
+          <h2 className="text-white font-bold text-lg mb-1">Feature Flags</h2>
+          <p className="text-gray-500 text-sm mb-6">
+            Toggle features on/off. Changes appear immediately in the sidebar for all users.
+          </p>
+
+          {flagsLoading ? (
+            <div className="text-gray-600 text-xs uppercase tracking-widest animate-pulse">Loading…</div>
+          ) : (
+            <div className="space-y-4 mb-6">
+              {([
+                { key: 'donations' as const,    label: 'Donasi / Payments', desc: 'Shows "Donasi" link in sidebar and footer CTA.' },
+                { key: 'merchandise' as const,  label: 'Merchandise',       desc: 'Shows "Merchandise" link in sidebar.' },
+              ]).map(({ key, label, desc }) => (
+                <div key={key} className="flex items-center justify-between gap-4 py-3 border-b border-white/5 last:border-0">
+                  <div>
+                    <p className="text-sm font-bold text-white">{label}</p>
+                    <p className="text-xs text-gray-600 mt-0.5">{desc}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleFlag(key)}
+                    className={`flex items-center gap-2 transition-colors ${activeFlags[key] ? 'text-gold' : 'text-gray-600'}`}
+                  >
+                    {activeFlags[key]
+                      ? <ToggleRight size={28} className="text-gold" />
+                      : <ToggleLeft size={28} />}
+                    <span className="text-xs font-bold uppercase tracking-widest">
+                      {activeFlags[key] ? 'On' : 'Off'}
+                    </span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button onClick={() => flagsMutation.mutate()}
+            disabled={flagsMutation.isPending || !flagsDirty}
+            className="flex items-center gap-2 bg-gold hover:bg-gold/90 text-charcoal font-bold py-2.5 px-6 rounded-full transition-all disabled:opacity-40 uppercase tracking-widest text-xs">
+            {flagsMutation.isPending
+              ? <><Loader size={14} className="animate-spin" /> Saving…</>
+              : flagsSaved
+                ? <><Check size={14} /> Saved</>
+                : 'Save'}
+          </button>
+
+          {flagsMutation.isError && (
+            <p className="text-red-400 text-xs mt-3">{(flagsMutation.error as Error).message}</p>
+          )}
+        </section>
 
         {/* ── Storage backend ── */}
         <section className="glass rounded-2xl p-6">

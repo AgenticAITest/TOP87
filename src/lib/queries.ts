@@ -13,6 +13,10 @@ export const qk = {
   adminMembers:   (isSuperAdmin: boolean, ids: string[]) => ['admin', 'members',   isSuperAdmin, ...ids]  as const,
   adminMedia:     (status: string, isSuperAdmin: boolean, ids: string[]) =>
                                                             ['admin', 'media', status, isSuperAdmin, ...ids] as const,
+  // Phase 0 — CMS, feature flags, member dashboard
+  cms:          (pageKey: string)                         => ['cms', pageKey]                              as const,
+  featureFlags: ()                                        => ['site_settings', 'feature_flags']            as const,
+  dashboard:    ()                                        => ['dashboard', 'member']                       as const,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

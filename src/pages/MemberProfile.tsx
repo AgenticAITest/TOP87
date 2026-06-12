@@ -29,36 +29,36 @@ export default function MemberProfile() {
   const primary = memberships.find(m => m.is_primary);
 
   return (
-    <div className="min-h-screen py-32 px-6">
-      <div className="max-w-3xl mx-auto">
-        <Link to="/directory" className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-gray-500 hover:text-gold transition-colors mb-12">
+    <div className="p-6 md:p-8">
+      <div className="max-w-3xl">
+        <Link to="/directory" className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-gray-500 hover:text-forest transition-colors mb-8">
           <ArrowLeft size={14} /> Directory
         </Link>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="flex flex-col sm:flex-row items-start gap-8 mb-12">
+          <div className="flex flex-col sm:flex-row items-start gap-6 mb-8">
             {profile.avatar_url ? (
               <img src={profile.avatar_url} alt={profile.name} referrerPolicy="no-referrer"
-                className="w-28 h-28 rounded-3xl object-cover shadow-[0_0_40px_rgba(212,175,55,0.15)]" />
+                className="w-24 h-24 rounded-2xl object-cover shadow-sm" />
             ) : (
-              <div className="w-28 h-28 rounded-3xl bg-gold/10 flex items-center justify-center shrink-0">
-                <span className="text-5xl font-serif font-bold text-gold">{profile.name?.charAt(0)}</span>
+              <div className="w-24 h-24 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+                <span className="text-4xl font-serif font-bold text-gold">{profile.name?.charAt(0)}</span>
               </div>
             )}
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <ShieldCheck size={14} className="text-green-400" />
-                <span className="text-xs uppercase tracking-widest text-green-400">Approved Member</span>
+                <ShieldCheck size={13} className="text-green-600" />
+                <span className="text-xs uppercase tracking-widest text-green-600">Approved Member</span>
               </div>
-              <h1 className="font-serif text-4xl font-bold text-white mb-2">{profile.name}</h1>
+              <h1 className="font-serif text-3xl font-bold text-forest mb-2">{profile.name}</h1>
               {profile.profession && (
-                <p className="text-gray-400 text-lg flex items-center gap-2">
-                  <Briefcase size={16} className="text-gold/50" /> {profile.profession}
+                <p className="text-gray-600 text-base flex items-center gap-2">
+                  <Briefcase size={15} className="text-gold/60" /> {profile.profession}
                 </p>
               )}
               {profile.city && (
                 <p className="text-gray-500 flex items-center gap-2 mt-1">
-                  <MapPin size={14} className="text-gold/50" /> {profile.city}
+                  <MapPin size={13} className="text-gold/60" /> {profile.city}
                 </p>
               )}
               {primary && (
@@ -71,22 +71,22 @@ export default function MemberProfile() {
           </div>
 
           {profile.bio && (
-            <div className="glass p-6 rounded-2xl mb-6">
-              <p className="text-xs uppercase tracking-widest text-gray-600 mb-3">About</p>
-              <p className="text-gray-300 leading-relaxed">{profile.bio}</p>
+            <div className="glass-card p-6 rounded-xl mb-5 shadow-sm">
+              <p className="text-xs uppercase tracking-widest text-gray-400 mb-3">About</p>
+              <p className="text-gray-700 leading-relaxed">{profile.bio}</p>
             </div>
           )}
 
           {memberships.length > 0 && (
-            <div className="glass p-6 rounded-2xl">
-              <p className="text-xs uppercase tracking-widest text-gray-600 mb-4">Charter Membership</p>
+            <div className="glass-card p-6 rounded-xl shadow-sm">
+              <p className="text-xs uppercase tracking-widest text-gray-400 mb-4">Charter Membership</p>
               <div className="flex flex-wrap gap-3">
                 {memberships.map(m => (
                   <Link key={m.charter_id} to={`/charters/${m.charter.slug}`}
                     className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-colors ${
                       m.is_primary
-                        ? 'bg-gold/10 text-gold border border-gold/20 hover:bg-gold/20'
-                        : 'glass text-gray-400 hover:text-white'
+                        ? 'bg-amber-50 text-gold border border-gold/30 hover:bg-amber-100'
+                        : 'bg-white text-gray-600 border border-amber-200 hover:border-amber-300 hover:text-forest'
                     }`}>
                     {m.charter.name}{m.is_primary ? ' ★' : ''}
                   </Link>

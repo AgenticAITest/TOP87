@@ -1,13 +1,17 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import MainLayout from './layouts/MainLayout';
 import AdminLayout from './layouts/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 
-import Landing      from './pages/Landing';
-import About        from './pages/About';
-import ChaptersPage from './pages/ChaptersPage';
+import PublicLanding    from './pages/PublicLanding';
+import Landing          from './pages/Landing';
+import About            from './pages/About';
+import AnggranPage      from './pages/AnggranPage';
+import FAQPage          from './pages/FAQPage';
+import PengumumanPage   from './pages/PengumumanPage';
+import ChaptersPage     from './pages/ChaptersPage';
 import CharterDetail from './pages/CharterDetail';
 import Directory    from './pages/Directory';
 import Gallery      from './pages/Gallery';
@@ -26,8 +30,22 @@ import AdminMedia   from './pages/admin/AdminMedia';
 import AdminCMS     from './pages/admin/AdminCMS';
 import SiteAdmin    from './pages/admin/SiteAdmin';
 import ContentAdmin from './pages/admin/ContentAdmin';
+import SiteCMSAdmin from './pages/admin/SiteCMSAdmin';
 import AllMembers   from './pages/admin/AllMembers';
 import AdminRoles   from './pages/admin/AdminRoles';
+
+function RootRoute() {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="min-h-screen parchment-bg flex items-center justify-center">
+        <p className="text-gray-400 text-xs uppercase tracking-widest animate-pulse">Memuat…</p>
+      </div>
+    );
+  }
+  if (user) return <Navigate to="/home" replace />;
+  return <PublicLanding />;
+}
 
 export default function App() {
   return (
@@ -36,14 +54,20 @@ export default function App() {
         {/* OAuth callback — no layout */}
         <Route path="/auth/callback" element={<AuthCallback />} />
 
+        {/* Public teaser landing — no sidebar */}
+        <Route path="/" element={<RootRoute />} />
+
         {/* Public + member routes */}
         <Route element={<MainLayout />}>
-          <Route path="/"            element={<Landing />} />
+          <Route path="/home"        element={<Landing />} />
           <Route path="/about"       element={<About />} />
           <Route path="/charters"    element={<ChaptersPage />} />
           <Route path="/charters/:slug" element={<CharterDetail />} />
           <Route path="/yearbook"         element={<Navigate to="/yearbook/2026" replace />} />
           <Route path="/yearbook/:year"   element={<YearbookPage />} />
+          <Route path="/anggaran"    element={<AnggranPage />} />
+          <Route path="/faq"         element={<FAQPage />} />
+          <Route path="/pengumuman"  element={<PengumumanPage />} />
           <Route path="/register"    element={<Register />} />
           <Route path="/pending"     element={<Pending />} />
 
@@ -63,6 +87,7 @@ export default function App() {
           <Route path="cms"        element={<AdminCMS />} />
           <Route path="site"        element={<SiteAdmin />} />
           <Route path="content"     element={<ContentAdmin />} />
+          <Route path="site-cms"    element={<SiteCMSAdmin />} />
           <Route path="all-members" element={<AllMembers />} />
           <Route path="roles"       element={<AdminRoles />} />
           <Route path="*"          element={<Navigate to="/admin" replace />} />

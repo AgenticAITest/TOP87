@@ -71,12 +71,12 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen bg-charcoal py-32 px-6">
+    <div className="py-12 px-6">
       <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
         className="max-w-2xl mx-auto">
-        <p className="text-xs uppercase tracking-[0.3em] text-gold/60 mb-3">Step 2 of 2</p>
-        <h1 className="font-serif text-4xl font-bold text-white mb-2">Complete your profile</h1>
-        <p className="text-gray-500 text-sm mb-10">
+        <p className="text-xs uppercase tracking-[0.3em] text-gold/70 mb-3">Step 2 of 2</p>
+        <h1 className="font-serif text-4xl font-bold text-forest mb-2">Complete your profile</h1>
+        <p className="text-gray-500 text-sm mb-8">
           Fill in your details and select your charter. Your membership will be reviewed by the charter admin.
         </p>
 
@@ -85,7 +85,7 @@ export default function Register() {
             <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Full Name *</label>
             <input required value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+              className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
               placeholder="Your full name" />
           </div>
 
@@ -94,14 +94,14 @@ export default function Register() {
               <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Current City *</label>
               <input required value={form.city}
                 onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+                className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
                 placeholder="e.g. Jakarta" />
             </div>
             <div>
               <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Profession</label>
               <input value={form.profession}
                 onChange={e => setForm(f => ({ ...f, profession: e.target.value }))}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+                className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
                 placeholder="e.g. Architect" />
             </div>
           </div>
@@ -110,7 +110,7 @@ export default function Register() {
             <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Phone / WhatsApp</label>
             <input value={form.phone}
               onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+              className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
               placeholder="+62 812 …" />
           </div>
 
@@ -119,7 +119,7 @@ export default function Register() {
             <textarea value={form.bio}
               onChange={e => setForm(f => ({ ...f, bio: e.target.value }))}
               rows={3}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors resize-none"
+              className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors resize-none"
               placeholder="A few words about yourself…" />
           </div>
 
@@ -132,10 +132,10 @@ export default function Register() {
                 const isExtra   = extraCharters.includes(charter.id);
                 return (
                   <div key={charter.id}
-                    className={`glass rounded-2xl p-4 cursor-pointer transition-all border ${
-                      isPrimary ? 'border-gold/60 bg-gold/5' :
-                      isExtra   ? 'border-white/20 bg-white/5' :
-                      'border-white/5 hover:border-white/15'
+                    className={`glass-card rounded-xl p-4 cursor-pointer transition-all border ${
+                      isPrimary ? 'border-gold/50 bg-amber-50/80' :
+                      isExtra   ? 'border-amber-300 bg-amber-50/50' :
+                      'border-amber-100 hover:border-amber-300'
                     }`}
                     onClick={() => {
                       if (isPrimary) return;
@@ -144,7 +144,7 @@ export default function Register() {
                     }}>
                     <div className="flex items-start justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-white">{charter.name}</p>
+                        <p className="text-sm font-semibold text-forest">{charter.name}</p>
                         <p className="text-xs text-gray-500">{charter.city}, {charter.country}</p>
                       </div>
                       {isPrimary ? (
@@ -170,7 +170,7 @@ export default function Register() {
           )}
 
           <button type="submit" disabled={submitMutation.isPending}
-            className="w-full bg-gold hover:bg-gold/90 text-charcoal font-bold py-4 rounded-full transition-all disabled:opacity-50 uppercase tracking-widest text-sm">
+            className="w-full btn-primary font-bold py-4 rounded-xl transition-all disabled:opacity-50 uppercase tracking-widest text-sm">
             {submitMutation.isPending ? 'Submitting…' : 'Submit for Approval'}
           </button>
         </form>

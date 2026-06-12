@@ -20,7 +20,7 @@ export default function AuthCallback() {
       } else if (!profile?.city) {
         navigate('/register');
       } else if (profile.status === 'approved') {
-        navigate('/');
+        navigate('/home');
       } else {
         navigate('/pending');
       }

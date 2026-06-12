@@ -34,20 +34,20 @@ export default function YearbookPage() {
   }
 
   return (
-    <div className="min-h-screen pt-28 pb-16 px-6">
-      <div className="max-w-6xl mx-auto">
+    <div className="p-6 md:p-8 pb-16">
+      <div className="max-w-6xl">
 
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <div className="flex items-center gap-3 mb-3">
             <BookOpen className="text-gold" size={18} />
-            <span className="text-xs uppercase tracking-[0.3em] text-gold">Yearbook</span>
+            <span className="text-xs uppercase tracking-[0.3em] text-gold/70">Yearbook</span>
           </div>
           <div className="flex items-end justify-between flex-wrap gap-4">
-            <h1 className="font-serif text-5xl md:text-7xl font-bold text-white">{year}</h1>
+            <h1 className="font-serif text-5xl md:text-6xl font-bold text-forest">{year}</h1>
             <Link
               to={`/yearbook/${otherYear}`}
-              className="flex items-center gap-1.5 text-xs uppercase tracking-widest text-gray-500 hover:text-gold transition-colors"
+              className="flex items-center gap-1.5 text-xs uppercase tracking-widest text-gray-500 hover:text-forest transition-colors"
             >
               Switch to {otherYear} <ChevronDown size={12} className="-rotate-90" />
             </Link>
@@ -61,16 +61,16 @@ export default function YearbookPage() {
 
         {/* Content */}
         {isLoading ? (
-          <div className="h-[70vh] glass rounded-2xl animate-pulse" />
+          <div className="h-[70vh] glass-card rounded-xl animate-pulse" />
         ) : !entry?.url ? (
-          <div className="h-[70vh] glass rounded-2xl flex flex-col items-center justify-center gap-3">
-            <BookOpen size={40} className="text-gold/20" />
-            <p className="text-gray-600 text-sm uppercase tracking-widest">Coming soon</p>
-            <p className="text-gray-700 text-xs">The {year} yearbook hasn't been uploaded yet.</p>
+          <div className="h-[70vh] glass-card rounded-xl flex flex-col items-center justify-center gap-3 shadow-sm">
+            <BookOpen size={40} className="text-gold/30" />
+            <p className="text-gray-500 text-sm uppercase tracking-widest">Coming soon</p>
+            <p className="text-gray-400 text-xs">The {year} yearbook hasn't been uploaded yet.</p>
           </div>
         ) : entry.type === 'pdf' ? (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
-            className="rounded-2xl overflow-hidden shadow-2xl border border-white/5">
+            className="rounded-xl overflow-hidden shadow-lg border border-amber-200">
             <iframe
               src={entry.url}
               className="w-full"
@@ -81,7 +81,7 @@ export default function YearbookPage() {
           </motion.div>
         ) : (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
-            className="rounded-2xl overflow-hidden shadow-2xl border border-white/5 aspect-video">
+            className="rounded-xl overflow-hidden shadow-lg border border-amber-200 aspect-video">
             <iframe
               src={getEmbedUrl(entry.url)}
               className="w-full h-full"
