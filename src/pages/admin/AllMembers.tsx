@@ -6,32 +6,46 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchCharters } from '../../lib/queries';
 
-// Fetches every profile with all their charter memberships (not just primary).
-// Used only by super admins — no RLS scoping needed.
 async function fetchAllMembersAdmin() {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, name, avatar_url, city, profession, status, created_at, charter_members(charter_id, is_primary, charters(id, name))')
+    .select('id, name, avatar_url, city, profession, status, reunion_attendance, created_at, charter_members(charter_id, is_primary, charters(id, name))')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data ?? []).map((p: any) => {
     const cms: any[] = p.charter_members ?? [];
     const primary = cms.find(cm => cm.is_primary);
     return {
-      id:               p.id as string,
-      name:             p.name as string | null,
-      avatar_url:       p.avatar_url as string | null,
-      city:             p.city as string | null,
-      profession:       p.profession as string | null,
-      status:           p.status as string,
-      created_at:       p.created_at as string,
-      primaryCharterId: (primary?.charters?.id ?? null) as string | null,
-      allCharters:      cms.map(cm => cm.charters?.name as string).filter(Boolean),
+      id:                 p.id as string,
+      name:               p.name as string | null,
+      avatar_url:         p.avatar_url as string | null,
+      city:               p.city as string | null,
+      profession:         p.profession as string | null,
+      status:             p.status as string,
+      reunion_attendance: (p.reunion_attendance ?? null) as string | null,
+      created_at:         p.created_at as string,
+      primaryCharterId:   (primary?.charters?.id ?? null) as string | null,
+      allCharters:        cms.map(cm => cm.charters?.name as string).filter(Boolean),
     };
   });
 }
 
 type Status = 'all' | 'pending' | 'approved' | 'suspended' | 'rejected';
+type AttendanceFilter = 'all' | 'yes' | 'most_likely' | 'undecided' | 'no' | 'none';
+
+const ATTENDANCE_LABELS: Record<string, string> = {
+  yes:         'Hadir',
+  most_likely: 'InshaAllah',
+  undecided:   'Belum Tahu',
+  no:          'Tidak Bisa',
+};
+
+const ATTENDANCE_COLORS: Record<string, string> = {
+  yes:         'bg-green-500/10 text-green-400',
+  most_likely: 'bg-blue-500/10  text-blue-400',
+  undecided:   'bg-yellow-500/10 text-yellow-400',
+  no:          'bg-red-500/10   text-red-400',
+};
 
 const STATUS_COLORS: Record<string, string> = {
   pending:   'bg-yellow-500/10 text-yellow-400',
@@ -57,6 +71,7 @@ export default function AllMembers() {
   const [search, setSearch]       = useState('');
   const [status, setStatus]       = useState<Status>('all');
   const [charterId, setCharterId] = useState('');
+  const [attendance, setAttendance] = useState<AttendanceFilter>('all');
 
   const { data: members = [], isLoading } = useQuery({
     queryKey: ['admin', 'all-members'],
@@ -80,6 +95,8 @@ export default function AllMembers() {
     let r = members;
     if (status !== 'all') r = r.filter(m => m.status === status);
     if (charterId)        r = r.filter(m => m.primaryCharterId === charterId);
+    if (attendance === 'none') r = r.filter(m => !m.reunion_attendance);
+    else if (attendance !== 'all') r = r.filter(m => m.reunion_attendance === attendance);
     if (search) {
       const q = search.toLowerCase();
       r = r.filter(m =>
@@ -90,7 +107,7 @@ export default function AllMembers() {
       );
     }
     return r;
-  }, [members, status, charterId, search]);
+  }, [members, status, charterId, attendance, search]);
 
   const actionMutation = useMutation({
     mutationFn: async ({ memberId, newStatus }: { memberId: string; newStatus: 'approved' | 'rejected' | 'suspended' }) => {
@@ -140,6 +157,15 @@ export default function AllMembers() {
           className="bg-zinc-900 border border-white/10 rounded-full px-4 py-2 text-sm text-gray-300 focus:outline-none focus:border-gold/50 transition-colors">
           <option value="">All Charters</option>
           {charters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <select value={attendance} onChange={e => setAttendance(e.target.value as AttendanceFilter)}
+          className="bg-zinc-900 border border-white/10 rounded-full px-4 py-2 text-sm text-gray-300 focus:outline-none focus:border-gold/50 transition-colors">
+          <option value="all">All Attendance</option>
+          <option value="yes">Hadir</option>
+          <option value="most_likely">InshaAllah</option>
+          <option value="undecided">Belum Tahu</option>
+          <option value="no">Tidak Bisa</option>
+          <option value="none">Belum Isi</option>
         </select>
       </div>
 
@@ -205,6 +231,12 @@ export default function AllMembers() {
               <span className="text-[10px] text-gray-600 shrink-0 hidden md:block">
                 {timeAgo(member.created_at)}
               </span>
+
+              {member.reunion_attendance && (
+                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 hidden lg:inline ${ATTENDANCE_COLORS[member.reunion_attendance] ?? 'text-gray-400'}`}>
+                  {ATTENDANCE_LABELS[member.reunion_attendance] ?? member.reunion_attendance}
+                </span>
+              )}
 
               <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${STATUS_COLORS[member.status] ?? 'text-gray-400'}`}>
                 {member.status}

@@ -12,6 +12,14 @@ export interface Profile {
   profession: string | null;
   status: 'pending' | 'approved' | 'suspended' | 'rejected';
   is_super_admin: boolean;
+  // Phase 1
+  nickname: string | null;
+  birthdate: string | null;
+  whatsapp: string | null;
+  reunion_attendance: 'yes' | 'most_likely' | 'undecided' | 'no' | null;
+  reunion_no_reason: string | null;
+  funny_event: string | null;
+  message_to_friends: string | null;
 }
 
 interface AuthContextType {

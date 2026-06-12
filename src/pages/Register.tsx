@@ -6,6 +6,13 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { qk, fetchCharters } from '../lib/queries';
 
+const ATTENDANCE_OPTIONS = [
+  { value: 'yes',         label: 'Ya, aku hadir!',        color: 'text-green-700 bg-green-50 border-green-300' },
+  { value: 'most_likely', label: 'InshaAllah hadir',       color: 'text-blue-700  bg-blue-50  border-blue-300' },
+  { value: 'undecided',   label: 'Belum tahu',             color: 'text-yellow-700 bg-yellow-50 border-yellow-300' },
+  { value: 'no',          label: 'Tidak bisa hadir',       color: 'text-red-600   bg-red-50   border-red-300' },
+] as const;
+
 export default function Register() {
   const { user, profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
@@ -14,11 +21,16 @@ export default function Register() {
   const [extraCharters, setExtras]   = useState<string[]>([]);
 
   const [form, setForm] = useState({
-    name:       profile?.name ?? user?.user_metadata?.full_name ?? '',
-    phone:      profile?.phone ?? '',
-    city:       profile?.city ?? '',
-    profession: profile?.profession ?? '',
-    bio:        profile?.bio ?? '',
+    name:               profile?.name ?? user?.user_metadata?.full_name ?? '',
+    phone:              profile?.phone ?? '',
+    city:               profile?.city ?? '',
+    profession:         profile?.profession ?? '',
+    bio:                profile?.bio ?? '',
+    nickname:           profile?.nickname ?? '',
+    birthdate:          profile?.birthdate ?? '',
+    whatsapp:           profile?.whatsapp ?? '',
+    reunion_attendance: (profile?.reunion_attendance ?? '') as string,
+    reunion_no_reason:  profile?.reunion_no_reason ?? '',
   });
 
   const { data: charters = [] } = useQuery({
@@ -35,14 +47,19 @@ export default function Register() {
       const { error: profileErr } = await supabase
         .from('profiles')
         .upsert({
-          id:         user.id,
-          name:       form.name,
-          phone:      form.phone || null,
-          city:       form.city,
-          profession: form.profession || null,
-          bio:        form.bio || null,
-          status:     'pending',
-          updated_at: new Date().toISOString(),
+          id:                 user.id,
+          name:               form.name,
+          phone:              form.phone || null,
+          city:               form.city,
+          profession:         form.profession || null,
+          bio:                form.bio || null,
+          nickname:           form.nickname || null,
+          birthdate:          form.birthdate || null,
+          whatsapp:           form.whatsapp || null,
+          reunion_attendance: form.reunion_attendance || null,
+          reunion_no_reason:  form.reunion_attendance === 'no' ? form.reunion_no_reason || null : null,
+          status:             'pending',
+          updated_at:         new Date().toISOString(),
         }, { onConflict: 'id' });
       if (profileErr) throw profileErr;
 
@@ -81,24 +98,35 @@ export default function Register() {
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Full Name *</label>
-            <input required value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
-              placeholder="Your full name" />
-          </div>
-
+          {/* ── Name + Nickname ── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Current City *</label>
+              <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Full Name *</label>
+              <input required value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
+                placeholder="Nama lengkap" />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Panggilan / Nickname</label>
+              <input value={form.nickname}
+                onChange={e => setForm(f => ({ ...f, nickname: e.target.value }))}
+                className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
+                placeholder="e.g. Budi, Neng, Dodot" />
+            </div>
+          </div>
+
+          {/* ── City + Profession ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Kota Domisili *</label>
               <input required value={form.city}
                 onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
                 className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
                 placeholder="e.g. Jakarta" />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Profession</label>
+              <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Pekerjaan</label>
               <input value={form.profession}
                 onChange={e => setForm(f => ({ ...f, profession: e.target.value }))}
                 className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
@@ -106,23 +134,73 @@ export default function Register() {
             </div>
           </div>
 
+          {/* ── Birthdate + WhatsApp ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Tanggal Lahir</label>
+              <input type="date" value={form.birthdate}
+                onChange={e => setForm(f => ({ ...f, birthdate: e.target.value }))}
+                className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors" />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">No. WhatsApp</label>
+              <input type="tel" value={form.whatsapp}
+                onChange={e => setForm(f => ({ ...f, whatsapp: e.target.value }))}
+                className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
+                placeholder="+62 812 …" />
+            </div>
+          </div>
+
+          {/* ── Phone (legacy) ── */}
           <div>
-            <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Phone / WhatsApp</label>
+            <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">No. Telepon Lain</label>
             <input value={form.phone}
               onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
               className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
-              placeholder="+62 812 …" />
+              placeholder="Opsional jika beda dari WA" />
           </div>
 
+          {/* ── Bio ── */}
           <div>
             <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Short Bio</label>
             <textarea value={form.bio}
               onChange={e => setForm(f => ({ ...f, bio: e.target.value }))}
               rows={3}
               className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors resize-none"
-              placeholder="A few words about yourself…" />
+              placeholder="Cerita singkat tentang dirimu…" />
           </div>
 
+          {/* ── Reunion Attendance ── */}
+          <div>
+            <label className="block text-xs uppercase tracking-widest text-gray-500 mb-3">
+              Rencana Kehadiran Reuni *
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {ATTENDANCE_OPTIONS.map(opt => (
+                <button key={opt.value} type="button"
+                  onClick={() => setForm(f => ({ ...f, reunion_attendance: opt.value, reunion_no_reason: '' }))}
+                  className={`px-4 py-3 rounded-xl text-sm font-medium border transition-all text-left ${
+                    form.reunion_attendance === opt.value
+                      ? opt.color + ' ring-2 ring-offset-1 ring-current'
+                      : 'bg-white border-amber-200 text-gray-600 hover:border-amber-300'
+                  }`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {form.reunion_attendance === 'no' && (
+              <div className="mt-3">
+                <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Alasan (opsional)</label>
+                <textarea value={form.reunion_no_reason}
+                  onChange={e => setForm(f => ({ ...f, reunion_no_reason: e.target.value }))}
+                  rows={2}
+                  className="w-full bg-white border border-red-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-red-400/50 transition-colors resize-none"
+                  placeholder="Ceritakan sedikit jika berkenan…" />
+              </div>
+            )}
+          </div>
+
+          {/* ── Charter Membership ── */}
           <div>
             <label className="block text-xs uppercase tracking-widest text-gray-500 mb-3">Charter Membership *</label>
             <p className="text-xs text-gray-600 mb-4">Select your primary charter. You may also join secondary charters.</p>

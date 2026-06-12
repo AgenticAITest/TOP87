@@ -17,6 +17,8 @@ export const qk = {
   cms:          (pageKey: string)                         => ['cms', pageKey]                              as const,
   featureFlags: ()                                        => ['site_settings', 'feature_flags']            as const,
   dashboard:    ()                                        => ['dashboard', 'member']                       as const,
+  // Phase 1 — friends
+  friends:      (profileId: string)                       => ['friends', profileId]                        as const,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -92,10 +94,22 @@ export async function fetchApprovedMembers() {
   });
 }
 
+export interface MemberPublicProfile {
+  id: string;
+  name: string | null;
+  avatar_url: string | null;
+  city: string | null;
+  profession: string | null;
+  bio: string | null;
+  nickname: string | null;
+  funny_event: string | null;
+  message_to_friends: string | null;
+}
+
 export async function fetchMemberById(id: string) {
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('id, name, avatar_url, city, profession, bio')
+    .select('id, name, avatar_url, city, profession, bio, nickname, funny_event, message_to_friends')
     .eq('id', id).eq('status', 'approved').single();
   must(profile, error);
 
@@ -105,11 +119,49 @@ export async function fetchMemberById(id: string) {
     .eq('profile_id', id);
 
   return {
-    profile: profile!,
+    profile: profile as unknown as MemberPublicProfile,
     memberships: (cms ?? []).map((cm: any) => ({
       charter_id: cm.charter_id, is_primary: cm.is_primary, charter: cm.charters,
     })),
   };
+}
+
+// ─── Phase 1 — Friends ────────────────────────────────────────────────────────
+
+export interface FriendEntry {
+  rank: number;
+  friend: { id: string; name: string; avatar_url: string | null };
+}
+
+export async function fetchFriends(profileId: string): Promise<FriendEntry[]> {
+  const { data: links } = await supabase
+    .from('profile_friends')
+    .select('rank, friend_id')
+    .eq('profile_id', profileId)
+    .order('rank');
+  if (!links || links.length === 0) return [];
+
+  const friendIds = links.map((l: any) => l.friend_id as string);
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, name, avatar_url')
+    .in('id', friendIds);
+
+  const profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.id, p]));
+  return links.map((l: any) => ({
+    rank: l.rank as number,
+    friend: profileMap[l.friend_id] ?? { id: l.friend_id, name: '?', avatar_url: null },
+  }));
+}
+
+export async function saveFriends(profileId: string, entries: { friendId: string; rank: number }[]): Promise<void> {
+  const { error: delErr } = await supabase.from('profile_friends').delete().eq('profile_id', profileId);
+  if (delErr) throw delErr;
+  if (entries.length === 0) return;
+  const { error } = await supabase.from('profile_friends').insert(
+    entries.map(e => ({ profile_id: profileId, friend_id: e.friendId, rank: e.rank }))
+  );
+  if (error) throw error;
 }
 
 export async function fetchCharterById(id: string) {

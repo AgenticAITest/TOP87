@@ -174,17 +174,40 @@ export default function Landing() {
             </div>
             <span className="text-2xl font-bold text-green-600">{attendancePct}%</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+          <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
             <div
               className="bg-green-600 h-2 rounded-full transition-all"
               style={{ width: `${attendancePct}%` }}
             />
           </div>
-          <p className="text-[11px] text-gray-600 mb-4">
+          <p className="text-[11px] text-gray-600 mb-3">
             {attendancePct >= 60
               ? 'Minimum kuota operasional tercapai ✓'
               : `Butuh ${Math.max(0, Math.ceil(quotaTarget * 0.6) - approvedCount)} lagi untuk kuota minimum`}
           </p>
+
+          {/* Attendance intent breakdown */}
+          {dashboard?.attendance && (
+            <div className="grid grid-cols-4 gap-1 mb-4 bg-amber-50/60 rounded-lg p-2 border border-amber-100">
+              <div className="text-center">
+                <p className="text-sm font-bold text-green-700">{dashboard.attendance.yes}</p>
+                <p className="text-[9px] text-gray-500 leading-tight">Hadir</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-bold text-blue-600">{dashboard.attendance.most_likely}</p>
+                <p className="text-[9px] text-gray-500 leading-tight">InshaAllah</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-bold text-yellow-600">{dashboard.attendance.undecided}</p>
+                <p className="text-[9px] text-gray-500 leading-tight">Belum Tahu</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-bold text-red-500">{dashboard.attendance.no}</p>
+                <p className="text-[9px] text-gray-500 leading-tight">Tidak Bisa</p>
+              </div>
+            </div>
+          )}
+
           <Link
             to="/register"
             className="btn-primary w-full py-2 rounded text-sm font-bold flex items-center justify-center gap-2"
