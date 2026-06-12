@@ -1,13 +1,14 @@
 import { useState, useMemo, ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { Check, Loader, HardDrive, Cloud, Shuffle, List, Search, X, Users, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Check, Loader, HardDrive, Cloud, Shuffle, List, Search, X, Users, ToggleLeft, ToggleRight, QrCode } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { getStorageBackend, setStorageBackend, type StorageBackend } from '../../lib/storage';
 import {
   getFeaturedConfig, setFeaturedConfig,
   fetchApprovedMembers,
-  type FeaturedMode, type FeaturedConfig,
+  fetchQRISConfig, setQRISConfig,
+  type FeaturedMode, type FeaturedConfig, type QRISConfig,
   qk,
 } from '../../lib/queries';
 
@@ -118,6 +119,34 @@ export default function SiteAdmin() {
       setTimeout(() => setStorageSaved(false), 2000);
     },
   });
+
+  // ── QRIS config state ──
+  const [qrisSaved, setQrisSaved] = useState(false);
+  const { data: currentQRIS, isLoading: qrisLoading } = useQuery({
+    queryKey: qk.qrisConfig(),
+    queryFn:  fetchQRISConfig,
+  });
+  const [localQRIS, setLocalQRIS] = useState<QRISConfig | null>(null);
+  const activeQRIS: QRISConfig = localQRIS ?? currentQRIS ?? {
+    qris_image_url: '', qris_bank_name: '', qris_account_no: '', qris_account_name: '',
+    reunion_fee_target: 2017000, donation_target: 10000000,
+  };
+
+  const qrisMutation = useMutation({
+    mutationFn: () => setQRISConfig(activeQRIS),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.qrisConfig() });
+      setQrisSaved(true);
+      setTimeout(() => setQrisSaved(false), 2000);
+    },
+  });
+
+  const qrisDirty = localQRIS !== null &&
+    JSON.stringify(localQRIS) !== JSON.stringify(currentQRIS);
+
+  function patchQRIS(key: keyof QRISConfig, value: string | number) {
+    setLocalQRIS({ ...activeQRIS, [key]: value });
+  }
 
   // ── Featured members state ──
   const [featuredSaved, setFeaturedSaved] = useState(false);
@@ -300,6 +329,81 @@ export default function SiteAdmin() {
                 <code className="font-mono text-yellow-300/80">media.top87.id</code>.
               </p>
             </div>
+          )}
+        </section>
+
+        {/* ── QRIS / Payment Config ── */}
+        <section className="glass rounded-2xl p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <QrCode size={16} className="text-gold/60" />
+            <h2 className="text-white font-bold text-lg">Konfigurasi Pembayaran (QRIS)</h2>
+          </div>
+          <p className="text-gray-500 text-sm mb-6">
+            Informasi ini ditampilkan di modal pembayaran anggota.
+          </p>
+
+          {qrisLoading ? (
+            <div className="text-gray-600 text-xs uppercase tracking-widest animate-pulse">Loading…</div>
+          ) : (
+            <div className="space-y-4 mb-6">
+              {([
+                { key: 'qris_image_url' as const,    label: 'URL Gambar QRIS',    placeholder: 'https://...',  type: 'url' },
+                { key: 'qris_bank_name' as const,    label: 'Nama Bank',          placeholder: 'BCA / BRI…',  type: 'text' },
+                { key: 'qris_account_no' as const,   label: 'Nomor Rekening',     placeholder: '0123456789',  type: 'text' },
+                { key: 'qris_account_name' as const, label: 'Nama Pemilik',       placeholder: 'Panitia TOP87', type: 'text' },
+              ]).map(({ key, label, placeholder, type }) => (
+                <div key={key}>
+                  <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1">{label}</label>
+                  <input
+                    type={type}
+                    value={(activeQRIS[key] as string) ?? ''}
+                    onChange={e => patchQRIS(key, e.target.value)}
+                    placeholder={placeholder}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+                  />
+                </div>
+              ))}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1">Iuran Per Orang (Rp)</label>
+                  <input
+                    type="number"
+                    value={activeQRIS.reunion_fee_target}
+                    onChange={e => patchQRIS('reunion_fee_target', parseInt(e.target.value, 10) || 0)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1">Target Donasi (Rp)</label>
+                  <input
+                    type="number"
+                    value={activeQRIS.donation_target}
+                    onChange={e => patchQRIS('donation_target', parseInt(e.target.value, 10) || 0)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* QRIS preview */}
+              {activeQRIS.qris_image_url && (
+                <div className="flex justify-center">
+                  <img src={activeQRIS.qris_image_url} alt="QRIS preview" className="w-32 h-32 object-contain rounded-lg border border-white/10" />
+                </div>
+              )}
+            </div>
+          )}
+
+          <button onClick={() => qrisMutation.mutate()}
+            disabled={qrisMutation.isPending || !qrisDirty}
+            className="flex items-center gap-2 bg-gold hover:bg-gold/90 text-charcoal font-bold py-2.5 px-6 rounded-full transition-all disabled:opacity-40 uppercase tracking-widest text-xs">
+            {qrisMutation.isPending
+              ? <><Loader size={14} className="animate-spin" /> Saving…</>
+              : qrisSaved
+                ? <><Check size={14} /> Saved</>
+                : 'Save'}
+          </button>
+          {qrisMutation.isError && (
+            <p className="text-red-400 text-xs mt-3">{(qrisMutation.error as Error).message}</p>
           )}
         </section>
 

@@ -1,0 +1,46 @@
+Member profile registration needs:
+- Full name
+- Nick Name
+- Birth date
+- Current Address
+- WhatsApp number
+- Reunion possibility (yes, most likely, cant decide now, no-with reason)
+
+Upload photo with description. 
+- Other members can add comments. 
+- Admin can delete inappropriate comments
+
+Funniest memorable event
+Friends that you spend the most time with (3)
+Message for other members
+
+Reunion registration countdown to a minimum of 122 people
+Reunion budget countdown
+Merchandise target countdown (multiple merchandise with current stock)
+
+Merchandise purchase:
+- select merchandise
+- image of money transfer
+
+Reunion Fees
+- member can pay via transfer
+- can have multiple payments
+- QRIS enabled for easy transfer method
+- Reports for Admin
+- Admin can update the amount (via manual reconciliation with bank statement)
+- Member can see the payment info: image of transfer, amount entered by member, and adjusted amount by admin
+
+Donation
+- member can dona via transfer
+- can have multiple donations
+- same QRIS
+- Admin can update the amount (via manual reconciliation with bank statement)
+- Member can see the payment info: image of transfer, amount entered by member, and adjusted amount by admin
+
+Update status to a WA number at 17:00 GMT+7
+- screenshot of total budget vs total payment received (line graph)
+- screenshot of total member registered in the web vs total member registered for reunion
+
+Image for poster/flyer perhaps in hero section
+
+Light/dark theme selection

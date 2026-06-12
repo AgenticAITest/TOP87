@@ -19,6 +19,20 @@ export const qk = {
   dashboard:    ()                                        => ['dashboard', 'member']                       as const,
   // Phase 1 — friends
   friends:      (profileId: string)                       => ['friends', profileId]                        as const,
+  // Phase 2 — payments
+  payments:      (profileId: string)                      => ['payments', profileId]                       as const,
+  adminPayments: (isSuperAdmin: boolean, ids: string[])   => ['admin', 'payments', isSuperAdmin, ...ids]   as const,
+  qrisConfig:    ()                                        => ['site_settings', 'qris']                     as const,
+  // Phase 3 — merchandise
+  merchandise:      ()                                      => ['merchandise']                                as const,
+  adminMerchandise: ()                                      => ['admin', 'merchandise']                       as const,
+  orders:           (profileId: string)                    => ['orders', profileId]                          as const,
+  adminOrders:      (isSuperAdmin: boolean, ids: string[]) => ['admin', 'orders', isSuperAdmin, ...ids]      as const,
+  // Financial report
+  financialReport:  ()                                      => ['admin', 'financial-report']                  as const,
+  // Phase 4 — comments
+  comments:         (mediaId: string)                       => ['comments', mediaId]                          as const,
+  latestComment:    ()                                      => ['comments', 'latest']                         as const,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -316,6 +330,135 @@ export async function setFeaturedConfig(cfg: FeaturedConfig): Promise<void> {
   if (error) throw error;
 }
 
+// ─── Phase 2 — Payments ───────────────────────────────────────────────────────
+
+export interface Payment {
+  id:                    string;
+  profile_id:            string;
+  type:                  'reunion_fee' | 'donation';
+  member_amount:         number;
+  admin_adjusted_amount: number | null;
+  receipt_url:           string | null;
+  status:                'submitted' | 'pending_review' | 'confirmed' | 'rejected';
+  member_notes:          string | null;
+  admin_notes:           string | null;
+  reviewed_by:           string | null;
+  reviewed_at:           string | null;
+  created_at:            string;
+  updated_at:            string;
+  profile?:              { name: string; avatar_url: string | null } | null;
+}
+
+export interface QRISConfig {
+  qris_image_url:    string;
+  qris_bank_name:    string;
+  qris_account_no:   string;
+  qris_account_name: string;
+  reunion_fee_target: number;
+  donation_target:    number;
+}
+
+const QRIS_KEYS = ['qris_image_url', 'qris_bank_name', 'qris_account_no', 'qris_account_name', 'reunion_fee_target', 'donation_target'];
+
+export async function fetchQRISConfig(): Promise<QRISConfig> {
+  const { data } = await supabase.from('site_settings').select('key, value').in('key', QRIS_KEYS);
+  const m = Object.fromEntries((data ?? []).map((r: any) => [r.key, r.value]));
+  return {
+    qris_image_url:    m['qris_image_url']    ?? '',
+    qris_bank_name:    m['qris_bank_name']    ?? '',
+    qris_account_no:   m['qris_account_no']   ?? '',
+    qris_account_name: m['qris_account_name'] ?? '',
+    reunion_fee_target: parseInt(m['reunion_fee_target'] ?? '2017000', 10),
+    donation_target:    parseInt(m['donation_target']    ?? '10000000', 10),
+  };
+}
+
+export async function setQRISConfig(cfg: QRISConfig): Promise<void> {
+  const { error } = await supabase.from('site_settings').upsert(
+    Object.entries(cfg).map(([key, value]) => ({ key, value: String(value) })),
+    { onConflict: 'key' }
+  );
+  if (error) throw error;
+}
+
+export async function fetchMyPayments(profileId: string): Promise<Payment[]> {
+  const { data, error } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('profile_id', profileId)
+    .order('created_at', { ascending: false });
+  must(data, error);
+  return (data ?? []) as Payment[];
+}
+
+export async function fetchAdminPayments(
+  isSuperAdmin: boolean,
+  charterIds: string[],
+  type?: 'reunion_fee' | 'donation' | null,
+  status?: string | null
+): Promise<Payment[]> {
+  const profileIds = await charterScope(isSuperAdmin, charterIds);
+
+  let q = supabase
+    .from('payments')
+    .select('*, profiles!payments_profile_id_fkey(name, avatar_url)')
+    .order('created_at', { ascending: false });
+
+  if (profileIds) q = q.in('profile_id', profileIds);
+  if (type)       q = q.eq('type', type);
+  if (status)     q = q.eq('status', status);
+
+  const { data, error } = await q;
+  must(data, error);
+  return (data ?? []).map((r: any) => ({
+    ...r,
+    profile: r.profiles ?? null,
+  })) as Payment[];
+}
+
+export async function submitPayment(input: {
+  profileId:   string;
+  type:        'reunion_fee' | 'donation';
+  amount:      number;
+  receiptUrl:  string | null;
+  notes:       string | null;
+}): Promise<void> {
+  const { error } = await supabase.from('payments').insert({
+    profile_id:   input.profileId,
+    type:         input.type,
+    member_amount: input.amount,
+    receipt_url:  input.receiptUrl,
+    member_notes: input.notes,
+    status:       'submitted',
+  });
+  if (error) throw error;
+}
+
+export async function updatePaymentAdmin(
+  id: string,
+  patch: { admin_adjusted_amount?: number | null; status?: string; admin_notes?: string | null; reviewed_by?: string }
+): Promise<void> {
+  const { error } = await supabase
+    .from('payments')
+    .update({ ...patch, reviewed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function fetchPaymentTotals(): Promise<{ reunion_fee: number; donation: number }> {
+  const { data } = await supabase
+    .from('payments')
+    .select('type, member_amount, admin_adjusted_amount')
+    .eq('status', 'confirmed');
+  const totals = { reunion_fee: 0, donation: 0 };
+  (data ?? []).forEach((p: any) => {
+    const amt = (p.admin_adjusted_amount ?? p.member_amount) as number;
+    if (p.type === 'reunion_fee') totals.reunion_fee += amt;
+    else if (p.type === 'donation') totals.donation += amt;
+  });
+  return totals;
+}
+
 // ─── Site Content (About + Yearbook) ─────────────────────────────────────────
 
 export interface AboutContent  { heroUrl: string; body: string; }
@@ -356,4 +499,363 @@ export async function setYearbookContent(yearbook: YearbookContent): Promise<voi
     { key: 'yearbook_2026_url',  value: yearbook.y2026.url  },
   ], { onConflict: 'key' });
   if (error) throw error;
+}
+
+// ─── Phase 3 — Merchandise ────────────────────────────────────────────────────
+
+export interface MerchandiseItem {
+  id:              string;
+  name:            string;
+  description:     string | null;
+  image_url:       string | null;
+  price:           number;
+  cost:            number;
+  stock_total:     number;
+  stock_remaining: number;
+  is_active:       boolean;
+  created_at:      string;
+  updated_at:      string;
+}
+
+export interface AdminMerchandiseItem extends MerchandiseItem {
+  sold: number;
+}
+
+export interface MerchandiseOrder {
+  id:                    string;
+  profile_id:            string;
+  merchandise_id:        string;
+  quantity:              number;
+  member_amount:         number;
+  admin_adjusted_amount: number | null;
+  receipt_url:           string | null;
+  status:                'submitted' | 'pending_review' | 'confirmed' | 'rejected' | 'shipped';
+  member_notes:          string | null;
+  admin_notes:           string | null;
+  shipping_address:      string | null;
+  reviewed_by:           string | null;
+  reviewed_at:           string | null;
+  created_at:            string;
+  updated_at:            string;
+  merchandise?: { name: string; image_url: string | null; price: number } | null;
+  profile?:     { name: string; avatar_url: string | null } | null;
+}
+
+function computeStockRemaining(
+  items: any[],
+  soldData: any[]
+): MerchandiseItem[] {
+  const soldCounts: Record<string, number> = {};
+  (soldData ?? []).forEach((r: any) => {
+    soldCounts[r.merchandise_id] = (soldCounts[r.merchandise_id] ?? 0) + (r.quantity as number);
+  });
+  return items.map((item: any) => ({
+    ...item,
+    price:           Number(item.price),
+    cost:            Number(item.cost ?? 0),
+    stock_remaining: Math.max(0, item.stock_total - (soldCounts[item.id] ?? 0)),
+  }));
+}
+
+export async function fetchMerchandiseItems(): Promise<MerchandiseItem[]> {
+  const [{ data: items }, { data: soldData }] = await Promise.all([
+    supabase.from('merchandise').select('*').eq('is_active', true).order('created_at'),
+    supabase.from('merchandise_orders').select('merchandise_id, quantity').in('status', ['confirmed', 'shipped']),
+  ]);
+  return computeStockRemaining(items ?? [], soldData ?? []);
+}
+
+export async function fetchAdminMerchandise(): Promise<AdminMerchandiseItem[]> {
+  const [{ data: items }, { data: soldData }] = await Promise.all([
+    supabase.from('merchandise').select('*').order('created_at', { ascending: false }),
+    supabase.from('merchandise_orders').select('merchandise_id, quantity').in('status', ['confirmed', 'shipped']),
+  ]);
+
+  const soldCounts: Record<string, number> = {};
+  (soldData ?? []).forEach((r: any) => {
+    soldCounts[r.merchandise_id] = (soldCounts[r.merchandise_id] ?? 0) + (r.quantity as number);
+  });
+
+  return (items ?? []).map((item: any) => ({
+    ...item,
+    price:           Number(item.price),
+    stock_remaining: Math.max(0, item.stock_total - (soldCounts[item.id] ?? 0)),
+    sold:            soldCounts[item.id] ?? 0,
+  }));
+}
+
+export async function createMerchandiseItem(item: {
+  name:         string;
+  description?: string | null;
+  image_url?:   string | null;
+  price:        number;
+  cost?:        number;
+  stock_total:  number;
+}): Promise<void> {
+  const { error } = await supabase.from('merchandise').insert(item);
+  if (error) throw error;
+}
+
+export async function updateMerchandiseItem(
+  id: string,
+  patch: Partial<{
+    name:        string;
+    description: string | null;
+    image_url:   string | null;
+    price:       number;
+    cost:        number;
+    stock_total: number;
+    is_active:   boolean;
+  }>
+): Promise<void> {
+  const { error } = await supabase.from('merchandise').update(patch).eq('id', id);
+  if (error) throw error;
+}
+
+export async function fetchMyOrders(profileId: string): Promise<MerchandiseOrder[]> {
+  const { data, error } = await supabase
+    .from('merchandise_orders')
+    .select('*, merchandise:merchandise_id(name, image_url, price)')
+    .eq('profile_id', profileId)
+    .order('created_at', { ascending: false });
+  must(data, error);
+  return (data ?? []).map((o: any) => ({
+    ...o,
+    member_amount:         Number(o.member_amount),
+    admin_adjusted_amount: o.admin_adjusted_amount ? Number(o.admin_adjusted_amount) : null,
+    merchandise:           o.merchandise
+      ? { ...o.merchandise, price: Number(o.merchandise.price) }
+      : null,
+  })) as MerchandiseOrder[];
+}
+
+export async function fetchAdminOrders(
+  isSuperAdmin: boolean,
+  charterIds: string[],
+): Promise<MerchandiseOrder[]> {
+  const profileIds = await charterScope(isSuperAdmin, charterIds);
+  let q = supabase
+    .from('merchandise_orders')
+    .select('*, merchandise:merchandise_id(name, image_url, price), profile:profile_id(name, avatar_url)')
+    .order('created_at', { ascending: false });
+  if (profileIds) q = q.in('profile_id', profileIds);
+  const { data, error } = await q;
+  must(data, error);
+  return (data ?? []).map((o: any) => ({
+    ...o,
+    member_amount:         Number(o.member_amount),
+    admin_adjusted_amount: o.admin_adjusted_amount ? Number(o.admin_adjusted_amount) : null,
+    merchandise:           o.merchandise
+      ? { ...o.merchandise, price: Number(o.merchandise.price) }
+      : null,
+  })) as MerchandiseOrder[];
+}
+
+export async function submitOrder(order: {
+  profile_id:       string;
+  merchandise_id:   string;
+  quantity:         number;
+  member_amount:    number;
+  receipt_url?:     string | null;
+  member_notes?:    string | null;
+  shipping_address: string;
+}): Promise<void> {
+  const { error } = await supabase.from('merchandise_orders').insert(order);
+  if (error) throw error;
+}
+
+export async function updateOrderAdmin(
+  id: string,
+  patch: {
+    status?:                 MerchandiseOrder['status'];
+    admin_adjusted_amount?:  number | null;
+    admin_notes?:            string | null;
+    reviewed_by?:            string;
+  }
+): Promise<void> {
+  const { error } = await supabase
+    .from('merchandise_orders')
+    .update({ ...patch, reviewed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function fetchMerchandiseTotals(): Promise<{ confirmed: number; pending: number }> {
+  const { data } = await supabase
+    .from('merchandise_orders')
+    .select('quantity, status');
+  const orders = data ?? [];
+  return {
+    confirmed: orders
+      .filter((o: any) => o.status === 'confirmed' || o.status === 'shipped')
+      .reduce((s: number, o: any) => s + (o.quantity as number), 0),
+    pending: orders.filter((o: any) => o.status === 'submitted').length,
+  };
+}
+
+export async function fetchMerchandiseMargin(): Promise<number> {
+  const { data } = await supabase
+    .from('merchandise_orders')
+    .select('quantity, merchandise:merchandise_id(price, cost)')
+    .in('status', ['confirmed', 'shipped']);
+  return (data ?? []).reduce((sum: number, o: any) => {
+    const price = Number(o.merchandise?.price ?? 0);
+    const cost  = Number(o.merchandise?.cost  ?? 0);
+    return sum + (price - cost) * (o.quantity as number);
+  }, 0);
+}
+
+// ─── Phase 4 — Comments ───────────────────────────────────────────────────────
+
+export interface MediaComment {
+  id:         string;
+  media_id:   string;
+  body:       string;
+  created_at: string;
+  profile:    { id: string; name: string; avatar_url: string | null };
+}
+
+export async function fetchComments(mediaId: string): Promise<MediaComment[]> {
+  const { data } = await supabase
+    .from('media_comments')
+    .select('id, media_id, body, created_at, profile:profiles(id, name, avatar_url)')
+    .eq('media_id', mediaId)
+    .order('created_at', { ascending: true });
+  return (data ?? []) as unknown as MediaComment[];
+}
+
+export async function addComment(mediaId: string, body: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  const { error } = await supabase
+    .from('media_comments')
+    .insert({ media_id: mediaId, profile_id: user.id, body: body.trim() });
+  if (error) throw error;
+}
+
+export async function deleteComment(id: string): Promise<void> {
+  const { error } = await supabase.from('media_comments').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function fetchLatestComment(): Promise<{ body: string; profileName: string } | null> {
+  const { data } = await supabase
+    .from('media_comments')
+    .select('body, profile:profiles(name)')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data) return null;
+  return { body: (data as any).body, profileName: (data as any).profile?.name ?? 'Alumni' };
+}
+
+export async function fetchBudgetTarget(): Promise<number> {
+  const { data } = await supabase
+    .from('site_settings')
+    .select('key, value')
+    .eq('key', 'budget_total_target')
+    .maybeSingle();
+  return data ? parseInt((data as any).value ?? '247000000', 10) : 247_000_000;
+}
+
+// ─── Financial Report ─────────────────────────────────────────────────────────
+
+export type FinancialTxType   = 'reunion_fee' | 'donation' | 'merchandise';
+export type FinancialTxStatus =
+  | 'submitted' | 'pending_review' | 'confirmed' | 'bank_reconciled' | 'shipped' | 'rejected';
+
+export interface FinancialReportRow {
+  id:              string;
+  rowType:         'payment' | 'merchandise';
+  txType:          FinancialTxType;
+  status:          FinancialTxStatus;
+  created_at:      string;
+  profile:         { id: string; name: string; avatar_url: string | null };
+  charter:         { id: string; name: string } | null;
+  memberAmount:    number;
+  effectiveAmount: number;
+  // Merchandise-specific (null for payments)
+  itemName:    string | null;
+  quantity:    number | null;
+  unitPrice:   number | null;
+  unitCost:    number | null;
+  totalRevenue: number | null; // unitPrice × quantity (catalog selling price)
+  totalMargin:  number | null; // (unitPrice - unitCost) × quantity
+}
+
+function pickCharter(profile: any): { id: string; name: string } | null {
+  const cms: any[] = profile?.charter_members ?? [];
+  const primary = cms.find((c: any) => c.is_primary) ?? cms[0];
+  return primary?.charter ?? null;
+}
+
+export async function fetchFinancialReport(): Promise<FinancialReportRow[]> {
+  const [{ data: payments }, { data: orders }] = await Promise.all([
+    supabase
+      .from('payments')
+      .select(`
+        id, type, member_amount, admin_adjusted_amount, status, created_at,
+        profile:profiles(
+          id, name, avatar_url,
+          charter_members(is_primary, charter:charters(id, name))
+        )
+      `)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('merchandise_orders')
+      .select(`
+        id, quantity, member_amount, admin_adjusted_amount, status, created_at,
+        profile:profiles(
+          id, name, avatar_url,
+          charter_members(is_primary, charter:charters(id, name))
+        ),
+        merchandise:merchandise_id(id, name, price, cost)
+      `)
+      .order('created_at', { ascending: false }),
+  ]);
+
+  const paymentRows: FinancialReportRow[] = (payments ?? []).map((p: any) => ({
+    id:              p.id,
+    rowType:         'payment',
+    txType:          p.type as FinancialTxType,
+    status:          p.status as FinancialTxStatus,
+    created_at:      p.created_at,
+    profile:         { id: p.profile.id, name: p.profile.name, avatar_url: p.profile.avatar_url },
+    charter:         pickCharter(p.profile),
+    memberAmount:    p.member_amount,
+    effectiveAmount: p.admin_adjusted_amount ?? p.member_amount,
+    itemName:    null,
+    quantity:    null,
+    unitPrice:   null,
+    unitCost:    null,
+    totalRevenue: null,
+    totalMargin:  null,
+  }));
+
+  const orderRows: FinancialReportRow[] = (orders ?? []).map((o: any) => {
+    const price = Number(o.merchandise?.price ?? 0);
+    const cost  = Number(o.merchandise?.cost  ?? 0);
+    const qty   = Number(o.quantity ?? 1);
+    return {
+      id:              o.id,
+      rowType:         'merchandise',
+      txType:          'merchandise',
+      status:          o.status as FinancialTxStatus,
+      created_at:      o.created_at,
+      profile:         { id: o.profile.id, name: o.profile.name, avatar_url: o.profile.avatar_url },
+      charter:         pickCharter(o.profile),
+      memberAmount:    o.member_amount,
+      effectiveAmount: o.admin_adjusted_amount ?? o.member_amount,
+      itemName:    o.merchandise?.name ?? null,
+      quantity:    qty,
+      unitPrice:   price,
+      unitCost:    cost,
+      totalRevenue: price * qty,
+      totalMargin:  (price - cost) * qty,
+    };
+  });
+
+  return [...paymentRows, ...orderRows].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
 }

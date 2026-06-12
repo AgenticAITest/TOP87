@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback, type MouseEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Play, Filter, Upload } from 'lucide-react';
+import { X, Play, Filter, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { qk, fetchApprovedMedia, fetchCharters } from '../lib/queries';
 import { resolveMediaUrl } from '../lib/storage';
+import MediaComments from '../components/MediaComments';
 
 type MediaItem = Awaited<ReturnType<typeof fetchApprovedMedia>>[number];
 
@@ -20,14 +21,49 @@ function isEmbedVideo(item: MediaItem): boolean {
 }
 function displayUrl(item: MediaItem): string | null {
   if (item.type === 'photo') return resolveMediaUrl(item.storage_path);
-  // Video: prefer external (YouTube/Vimeo), fall back to VPS-stored video
   return item.external_url ?? resolveMediaUrl(item.storage_path);
 }
 
+// ─── Slide variants ───────────────────────────────────────────────────────────
+const slideVariants = {
+  enter:  (dir: number) => ({ x: dir >= 0 ? 180 : -180, opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit:   (dir: number) => ({ x: dir >= 0 ? -180 : 180, opacity: 0 }),
+};
+
+// ─── Arrow button ─────────────────────────────────────────────────────────────
+function ArrowBtn({
+  side, onClick,
+}: {
+  side: 'left' | 'right';
+  onClick: (e: MouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`fixed top-1/2 -translate-y-1/2 z-10
+        ${side === 'left' ? 'left-2 md:left-4' : 'right-2 md:right-4'}
+        w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm border border-white/10
+        flex items-center justify-center text-white
+        hover:bg-gold/20 hover:border-gold/30 hover:text-gold
+        transition-all active:scale-95`}
+      aria-label={side === 'left' ? 'Sebelumnya' : 'Berikutnya'}
+    >
+      {side === 'left'
+        ? <ChevronLeft  size={20} />
+        : <ChevronRight size={20} />}
+    </button>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function Gallery() {
   const [selectedCharter, setCharter] = useState('');
-  const [selectedYear, setYear]       = useState('');
-  const [lightbox, setLightbox]       = useState<MediaItem | null>(null);
+  const [selectedYear,    setYear]    = useState('');
+  const [lightboxIdx,  setLightboxIdx] = useState<number | null>(null);
+  const [direction,    setDirection]   = useState(1);
+  const backdropRef                    = useRef<HTMLDivElement>(null);
+  const touchStartX                    = useRef(0);
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: qk.media('approved'),
@@ -42,7 +78,7 @@ export default function Gallery() {
 
   const years = useMemo(() =>
     [...new Set(items.map(m => m.year_taken).filter(Boolean) as number[])].sort((a, b) => b - a),
-    [items]
+    [items],
   );
 
   const filtered = useMemo(() => {
@@ -52,9 +88,41 @@ export default function Gallery() {
     return r;
   }, [items, selectedCharter, selectedYear]);
 
+  const lightbox = lightboxIdx !== null ? (filtered[lightboxIdx] ?? null) : null;
+
+  // Navigate with wrapping
+  const navigate = useCallback((delta: number) => {
+    if (filtered.length === 0) return;
+    setDirection(delta);
+    setLightboxIdx(prev =>
+      prev === null ? prev
+        : ((prev + delta) % filtered.length + filtered.length) % filtered.length,
+    );
+    // scroll the backdrop back to top so comments don't feel sticky
+    requestAnimationFrame(() => backdropRef.current?.scrollTo({ top: 0, behavior: 'instant' }));
+  }, [filtered.length]);
+
+  // Keyboard: ←/→ navigate, Escape close
+  useEffect(() => {
+    if (lightboxIdx === null) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') navigate(1);
+      else if (e.key === 'ArrowLeft') navigate(-1);
+      else if (e.key === 'Escape') setLightboxIdx(null);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [lightboxIdx, navigate]);
+
+  function openLightbox(idx: number) {
+    setDirection(1);
+    setLightboxIdx(idx);
+  }
+
   return (
     <section className="p-6 md:p-8 min-h-screen">
       <div className="max-w-7xl">
+        {/* ── Header ── */}
         <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-5 mb-8">
           <div>
             <span className="text-xs font-bold tracking-[0.3em] uppercase text-gold/70 mb-2 block">Memories</span>
@@ -83,6 +151,7 @@ export default function Gallery() {
           </div>
         </div>
 
+        {/* ── Grid ── */}
         {isLoading ? (
           <div className="text-center py-20 text-gray-400 text-sm tracking-widest uppercase animate-pulse">Loading gallery…</div>
         ) : filtered.length === 0 ? (
@@ -96,7 +165,7 @@ export default function Gallery() {
                 <motion.div key={item.id}
                   initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: Math.min(i * 0.03, 0.4) }}
-                  onClick={() => setLightbox(item)}
+                  onClick={() => openLightbox(i)}
                   className="break-inside-avoid mb-4 rounded-2xl overflow-hidden cursor-pointer group relative">
                   {thumb
                     ? <img src={thumb} alt={item.caption ?? ''} loading="lazy"
@@ -127,44 +196,99 @@ export default function Gallery() {
         )}
       </div>
 
+      {/* ── Lightbox ── */}
       <AnimatePresence>
-        {lightbox && (() => {
-          const url = displayUrl(lightbox);
-          return (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setLightbox(null)}
-              className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 md:p-8">
-              <button onClick={() => setLightbox(null)}
-                className="absolute top-4 right-4 w-10 h-10 rounded-full glass flex items-center justify-center text-white hover:text-gold transition-colors z-10">
-                <X size={18} />
-              </button>
-              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }} transition={{ duration: 0.2 }}
-                onClick={e => e.stopPropagation()} className="max-w-4xl w-full">
-                {lightbox.type === 'photo' && url
-                  ? <img src={url} alt={lightbox.caption ?? ''} className="w-full max-h-[80vh] object-contain rounded-2xl" />
-                  : isEmbedVideo(lightbox) && url
-                    ? <div className="aspect-video rounded-2xl overflow-hidden">
-                        <iframe src={embedUrl(url)} className="w-full h-full" allowFullScreen title={lightbox.caption ?? 'Video'} />
-                      </div>
-                    : url
+        {lightbox && (
+          <motion.div
+            ref={backdropRef}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/95 overflow-y-auto"
+            onClick={() => setLightboxIdx(null)}
+            onTouchStart={e  => { touchStartX.current = e.touches[0].clientX; }}
+            onTouchEnd={e => {
+              const delta = touchStartX.current - e.changedTouches[0].clientX;
+              if (Math.abs(delta) > 50) navigate(delta > 0 ? 1 : -1);
+            }}
+          >
+            {/* Close */}
+            <button
+              onClick={() => setLightboxIdx(null)}
+              className="fixed top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 flex items-center justify-center text-white hover:text-gold hover:border-gold/30 transition-all"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Counter */}
+            {filtered.length > 1 && (
+              <div className="fixed top-4 left-1/2 -translate-x-1/2 z-20 px-3 py-1 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 text-white text-xs font-bold tracking-widest">
+                {lightboxIdx! + 1} / {filtered.length}
+              </div>
+            )}
+
+            {/* Prev / Next arrows */}
+            {filtered.length > 1 && (
+              <>
+                <ArrowBtn side="left"  onClick={e => { e.stopPropagation(); navigate(-1); }} />
+                <ArrowBtn side="right" onClick={e => { e.stopPropagation(); navigate(1);  }} />
+              </>
+            )}
+
+            {/* Centering wrapper — px-14 md:px-20 leaves room for arrow buttons */}
+            <div
+              className="flex min-h-full items-center justify-center px-14 py-6 md:px-20 md:py-8"
+              onClick={e => e.stopPropagation()}
+            >
+              <AnimatePresence mode="wait" custom={direction}>
+                <motion.div
+                  key={lightboxIdx}
+                  custom={direction}
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.18, ease: 'easeInOut' }}
+                  className="max-w-4xl w-full"
+                >
+                  {/* Media */}
+                  {lightbox.type === 'photo' && displayUrl(lightbox)
+                    ? <img
+                        src={displayUrl(lightbox)!}
+                        alt={lightbox.caption ?? ''}
+                        className="w-full max-h-[55vh] object-contain rounded-2xl"
+                      />
+                    : isEmbedVideo(lightbox) && displayUrl(lightbox)
                       ? <div className="aspect-video rounded-2xl overflow-hidden">
-                          <video src={url} controls className="w-full h-full" />
+                          <iframe src={embedUrl(displayUrl(lightbox)!)} className="w-full h-full" allowFullScreen title={lightbox.caption ?? 'Video'} />
                         </div>
-                      : null
-                }
-                {(lightbox.caption || lightbox.charter || lightbox.profile) && (
-                  <div className="mt-4 text-center px-4">
-                    {lightbox.caption && <p className="text-gray-300 text-sm mb-1">{lightbox.caption}</p>}
-                    <p className="text-gold/50 text-xs uppercase tracking-widest">
-                      {[lightbox.charter?.name, lightbox.year_taken, lightbox.profile?.name].filter(Boolean).join(' · ')}
-                    </p>
+                      : displayUrl(lightbox)
+                        ? <div className="aspect-video rounded-2xl overflow-hidden">
+                            <video src={displayUrl(lightbox)!} controls className="w-full h-full" />
+                          </div>
+                        : null
+                  }
+
+                  {/* Caption + comments */}
+                  <div className="mt-4 px-2">
+                    {(lightbox.caption || lightbox.charter || lightbox.profile) && (
+                      <div className="text-center mb-4">
+                        {lightbox.caption && (
+                          <p className="text-gray-300 text-sm mb-1">{lightbox.caption}</p>
+                        )}
+                        <p className="text-gold/50 text-xs uppercase tracking-widest">
+                          {[lightbox.charter?.name, lightbox.year_taken, lightbox.profile?.name]
+                            .filter(Boolean).join(' · ')}
+                        </p>
+                      </div>
+                    )}
+                    <div className="border-t border-white/10 pt-4">
+                      <MediaComments mediaId={lightbox.id} variant="dark" />
+                    </div>
                   </div>
-                )}
-              </motion.div>
-            </motion.div>
-          );
-        })()}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </section>
   );

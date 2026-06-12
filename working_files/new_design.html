@@ -1,0 +1,430 @@
+﻿<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TOP87 Reunion Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style data-purpose="custom-fonts">
+  body { font-family: 'Inter', sans-serif; }
+  h1, h2, h3, .serif-font { font-family: 'Crimson Pro', serif; }
+</style>
+<style data-purpose="custom-backgrounds">
+  /* Sidebar textured background */
+  .sidebar-bg {
+    background-color: #0d2b1f;
+    background-image: radial-gradient(circle at 50% 50%, rgba(20, 50, 40, 0.8) 0%, rgba(13, 43, 31, 1) 100%);
+    position: relative;
+  }
+  .sidebar-bg::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    opacity: 0.05;
+    pointer-events: none;
+    background-image: url('https://www.transparenttextures.com/patterns/dark-leather.png');
+  }
+
+  /* Main content parchment background */
+  .parchment-bg {
+    background-color: #f4efdf;
+    background-image: url('https://www.transparenttextures.com/patterns/paper-fibers.png');
+  }
+
+  /* Hero section */
+  .hero-container {
+    background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)),
+      url('https://lh3.googleusercontent.com/aida-public/AB6AXuCOxo017MjTEyKUE3qcKGa1xCVM16fgYQanJPDfTQeZkN1KZ6Z-CFoWwaDZk0jihCeLC0Tr53bf8ikxKeQj07hCWleaeXHMEScu8AvFBMUrC9Ivhaxn878nLCYbB3LQoRr4o_rRXlllRKzlUPOnVvOjs05nNSlxh52Wn3TdEy_YMn66uXypkhqnbMiVJ5cjZuvf82MOj9R9xmodoNBxihq-VK_7GJ3R6D5POpw4799o61F4lpxWnBR3omIwDvt7_C-B2OmY5KPlVo_x');
+    background-size: 140% auto;
+    background-position: center 18%;
+  }
+
+  /* FIX 1: Warm cream card backgrounds (was rgba white) */
+  .glass-card {
+    background: rgba(248, 244, 236, 0.85);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(212, 175, 55, 0.15);
+  }
+</style>
+<style data-purpose="accent-colors">
+  .text-gold { color: #d4af37; }
+  .bg-gold { background-color: #d4af37; }
+  .border-gold { border-color: #d4af37; }
+  .btn-primary {
+    background: linear-gradient(to right, #c67119, #a35a12);
+    color: white;
+    transition: all 0.3s ease;
+  }
+  .btn-primary:hover {
+    background: linear-gradient(to right, #a35a12, #8a4a0d);
+  }
+</style>
+</head>
+<body class="flex min-h-screen">
+
+<!-- BEGIN: LeftSidebar -->
+<aside class="sidebar-bg w-64 flex-shrink-0 text-white flex flex-col border-r border-green-900 sticky top-0 h-screen overflow-y-auto z-10">
+  <div class="p-8 text-center flex flex-col items-center">
+    <div class="w-24 h-24 rounded-full border-2 border-gold flex items-center justify-center mb-4 p-2">
+      <div class="text-xs font-bold text-gold text-center">
+        <div class="text-lg">TOP87</div>
+        <div class="text-[8px] uppercase tracking-tighter">ALUMNI ASSOCIATION</div>
+      </div>
+    </div>
+    <h2 class="serif-font text-lg font-bold text-gold tracking-widest uppercase">Reuni 40 Tahun</h2>
+    <p class="text-sm font-medium tracking-widest">TOP87</p>
+  </div>
+  <nav class="flex-grow px-4 space-y-1">
+    <a class="flex items-center px-4 py-3 bg-white/10 rounded-md group" href="#">
+      <svg class="w-5 h-5 mr-3 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+      <span class="text-sm font-medium">Dashboard</span>
+    </a>
+    <a class="flex items-center px-4 py-3 hover:bg-white/5 rounded-md transition text-gray-300" href="#">
+      <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+      <span class="text-sm">Anggaran &amp; Transparansi</span>
+    </a>
+    <a class="flex items-center px-4 py-3 hover:bg-white/5 rounded-md transition text-gray-300" href="#">
+      <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+      <span class="text-sm">Merchandise</span>
+    </a>
+    <a class="flex items-center px-4 py-3 hover:bg-white/5 rounded-md transition text-gray-300" href="#">
+      <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+      <span class="text-sm">Donasi</span>
+    </a>
+    <a class="flex items-center px-4 py-3 hover:bg-white/5 rounded-md transition text-gray-300" href="#">
+      <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+      <span class="text-sm">Pengumuman</span>
+    </a>
+    <a class="flex items-center px-4 py-3 hover:bg-white/5 rounded-md transition text-gray-300" href="#">
+      <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+      <span class="text-sm">FAQ</span>
+    </a>
+  </nav>
+  <!-- User Profile & Footer CTA -->
+  <div class="mt-auto p-4 space-y-4">
+    <div class="bg-black/20 rounded-lg p-3 flex items-center justify-between">
+      <div class="flex items-center">
+        <div class="w-10 h-10 rounded-full bg-gray-500 overflow-hidden border border-gold/50">
+          <img alt="User Avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVT_TZC1NExy62eKr0tjdtmWboCBYYmALBjfq36Ylj7ZeN-IMfl4muO_lu2gCB-NAhpPDE4QUfDbj0vd8HVTdVPk0sMdFyveg02veEs1K8bIUsVpU39OPJkv7S3G2mH3y2S8FtEN8hGrMNrIt5dVPM2IIvBU4OvmXn7yaVMI5FmZtOLYhLbYI-4SsEcc0eY52BaKaTY7f9OGPZTx2jiymufPMcZ0B652zhXUio3U9Wnk2bvg3qzb1BIU-mdrffbhWoe6VP2zpA4wNF"/>
+        </div>
+        <div class="ml-3">
+          <p class="text-xs text-gray-400">User:</p>
+          <p class="text-sm font-semibold">Budi S.</p>
+        </div>
+      </div>
+      <div class="relative">
+        <svg class="w-5 h-5 text-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"></path></svg>
+        <span class="absolute -top-1 -right-1 bg-red-500 text-[8px] px-1 rounded-full">!</span>
+      </div>
+    </div>
+    <button class="w-full btn-primary py-2 px-4 rounded font-bold text-xs uppercase flex items-center justify-center tracking-wider shadow-lg">
+      <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20"><path clip-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" fill-rule="evenodd"></path></svg>
+      Donasi Sekarang
+    </button>
+    <div class="flex justify-center text-[10px] text-gray-500 space-x-2">
+      <span>Settings</span>
+      <span>Logout</span>
+    </div>
+  </div>
+</aside>
+<!-- END: LeftSidebar -->
+
+<!-- BEGIN: MainContent -->
+<main class="flex-grow parchment-bg p-8 overflow-y-auto" style="background-color:#f4efdf; background-image: url('https://www.transparenttextures.com/patterns/paper-fibers.png'); background-attachment: fixed;">
+
+  <!-- BEGIN: HeroSection -->
+  <!-- FIX 2: Corrected date year from 3637 to 2027, dates from 20-30 to 29-30 -->
+  <section class="hero-container relative h-72 rounded-xl overflow-hidden shadow-2xl mb-8 flex flex-col justify-end p-8 text-white" style="background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://lh3.googleusercontent.com/aida-public/AB6AXuDienlifKMhtTUolYBLbsKRBI_Pm4GAKAOWlwq-Sw5FNXQ5OCEXVGVGNbykCWE-p-wa2dLRCRbIU7dXWlTXEbR2NLNYhbaPI6P7QJq35Vd0yyyeGVhO4UFWLpcH4K7gU-eLaFkuRlxF3woGCydutydziNHHwFs_1Jnokl9yhIyrFhxSUoupYfr8dbk1Ds-RjAhBBa6iZx3ZFEspkkWXM7BA3937ASrScz9oAQUFS-IB4TbBXgm4tsB3uVLPLAZQhOzj4-1dvrg_NKmg6u'); background-size: cover; background-position: center center; background-blend-mode: multiply;">
+    <div class="relative z-10">
+      <p class="text-xs uppercase tracking-[0.3em] font-light mb-2">29 – 30 April 2027 • BANDUNG / CIWIDEY</p>
+      <h1 class="text-4xl font-bold mb-2">Sekarang Aku Menjadi Dewasa</h1>
+      <p class="italic text-sm text-gray-200 mb-6 font-light">"Jika bukan kita yang merayakan, siapa lagi?"</p>
+      <div class="flex space-x-4">
+        <button class="btn-primary px-8 py-2.5 rounded text-sm font-bold shadow-lg">Daftar Sekarang</button>
+        <button class="bg-black/30 hover:bg-black/40 backdrop-blur-sm border border-white/20 px-8 py-2.5 rounded text-sm font-medium transition">Pesan Merchandise</button>
+      </div>
+    </div>
+    <!-- Countdown Widget -->
+    <div class="absolute right-8 bottom-8 bg-black/60 backdrop-blur-md p-4 rounded-lg border border-white/10 text-center min-w-[200px]">
+      <p class="text-[10px] uppercase tracking-widest text-gray-300 mb-2">Countdown Menuju Reuni</p>
+      <div class="flex justify-between items-center px-2">
+        <div><span class="text-2xl font-bold">339</span><p class="text-[8px] uppercase">Hari</p></div>
+        <div class="text-xl font-light text-gray-500">:</div>
+        <div><span class="text-2xl font-bold">14</span><p class="text-[8px] uppercase">Jam</p></div>
+        <div class="text-xl font-light text-gray-500">:</div>
+        <div><span class="text-2xl font-bold">26</span><p class="text-[8px] uppercase">Menit</p></div>
+      </div>
+    </div>
+  </section>
+  <!-- END: HeroSection -->
+
+  <!-- BEGIN: TopMetricsGrid -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <!-- Attendance Card -->
+    <div class="glass-card p-6 rounded-xl shadow-sm">
+      <div class="flex items-center mb-4">
+        <div class="p-2 bg-green-100 rounded text-green-700 mr-3">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+        </div>
+        <h3 class="font-bold text-gray-800">Kehadiran Alumni</h3>
+      </div>
+      <div class="flex items-end justify-between mb-2">
+        <div class="flex items-baseline">
+          <span class="text-3xl font-bold text-gray-900">89</span>
+          <span class="text-gray-500 text-lg mx-1">/</span>
+          <span class="text-xl text-gray-500">122</span>
+          <span class="ml-2 text-sm text-gray-400">Alumni</span>
+        </div>
+        <span class="text-2xl font-bold text-green-600">73%</span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-2 mb-4">
+        <div class="bg-green-600 h-2 rounded-full" style="width: 73%"></div>
+      </div>
+      <p class="text-[11px] text-gray-600 mb-4">Minimum kuota operasional tercapai</p>
+      <button class="w-full btn-primary py-2 rounded text-sm font-bold flex items-center justify-center">
+        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z"></path><path clip-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" fill-rule="evenodd"></path></svg>
+        Daftar Sekarang
+      </button>
+    </div>
+    <!-- Funds Card -->
+    <div class="glass-card p-6 rounded-xl shadow-sm">
+      <div class="flex items-center mb-4">
+        <div class="p-2 bg-orange-100 rounded text-orange-700 mr-3">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+        </div>
+        <h3 class="font-bold text-gray-800">Total Dana Terkumpul</h3>
+      </div>
+      <p class="text-3xl font-bold text-gray-900 mb-2">Rp 26.000.000</p>
+      <p class="text-xs text-gray-600 leading-relaxed">Gabungan dari iuran, Donasi Sukarela, dan Margin Keuntungan Merchandise.</p>
+      <div class="mt-8 flex space-x-2">
+        <div class="h-1 bg-orange-200 flex-grow rounded"></div>
+        <div class="h-1 bg-orange-400 flex-grow rounded"></div>
+        <div class="h-1 bg-orange-600 flex-grow rounded"></div>
+      </div>
+    </div>
+    <!-- Merchandise Order Card -->
+    <div class="glass-card p-6 rounded-xl shadow-sm">
+      <div class="flex items-center mb-4">
+        <div class="p-2 bg-yellow-100 rounded text-yellow-700 mr-3">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+        </div>
+        <h3 class="font-bold text-gray-800">Merchandise Terpesan</h3>
+      </div>
+      <ul class="text-sm space-y-2 text-gray-700 mb-4">
+        <li class="flex justify-between"><span>Kaos Resmi:</span> <span class="font-bold">72 pcs</span></li>
+        <li class="flex justify-between"><span>Tumbler Premium:</span> <span class="font-bold">57 pcs</span></li>
+        <li class="flex justify-between"><span>Topi Reuni:</span> <span class="font-bold">15 pcs</span></li>
+      </ul>
+      <div class="pt-3 border-t border-amber-200">
+        <p class="text-[11px] text-orange-700 italic">Batch 1 pemesanan sedang diproses.</p>
+      </div>
+    </div>
+  </div>
+  <!-- END: TopMetricsGrid -->
+
+  <!-- BEGIN: MiddleGrid -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    <!-- Recent Registration -->
+    <div class="glass-card p-6 rounded-xl shadow-sm col-span-1">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-bold text-gray-800">Pendaftaran Terbaru</h3>
+        <button class="text-[10px] text-gray-500 uppercase tracking-tighter">Lihat Semua</button>
+      </div>
+      <div class="space-y-4">
+        <div class="flex items-center">
+          <img alt="User" class="w-10 h-10 rounded-full border border-amber-200" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5b2p-x9c0Z3UPr1OE1bNXCK1aMB-IFo6R0LNHzS6N5vwprbu6mta2akSJKyinZHPQ_su_XGWzNqTZIgf55MG7nW7Oc98eAFR7fmpIZR2Gg-tRMNf6AUVIiO6MG9IxfaiQL2zYn-R5Ku2_xTuNK4uGjIcZbiEWm9QMTewIXuZemZp5FXso1xX88sST-_umSt_pEGu1dp23BfVi3Pc5HEnX2l0cE_YeMFaqe0mDNUGik0ikxTGUOm02-IsAiZ0uWISu046VxoftdWIZ"/>
+          <div class="ml-3 flex-grow">
+            <h4 class="text-sm font-bold">Sudi Sarnoto</h4>
+            <p class="text-[10px] text-gray-500">21 Jan 2024 • 20:15 WIB</p>
+          </div>
+          <span class="text-[9px] bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold uppercase">Lunas</span>
+        </div>
+        <div class="flex items-center">
+          <img alt="User" class="w-10 h-10 rounded-full border border-amber-200" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBb41g2VbgdWVu7elJKlxA75b4Z6ggGKqtc-mixQWgFhrFkmvcVdki1nAxqrv38SlQ6CJF01ILoVyklhTZwPyWvwFWU9ZqlaGc8-jz7f2QAjNEBgsd070zpOkK4HggBCg7QZzxeLh-pI9csEIvz99oghJvKMi4uYwTfHgqY_occi37Xrbr7P4VZT9ontCaWTjqV58P4A5xze-mZAvq4_gyoFahKQJEi3PpQfpWBabsN_GHGCC_RxHWHI56aL8vYd8uDc_RnqSpwf4KT"/>
+          <div class="ml-3 flex-grow">
+            <h4 class="text-sm font-bold">Ina Martina</h4>
+            <p class="text-[10px] text-gray-500">17 Jan 2024 • 07:12 WIB</p>
+          </div>
+          <span class="text-[9px] bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold uppercase">Lunas</span>
+        </div>
+        <div class="flex items-center">
+          <img alt="User" class="w-10 h-10 rounded-full border border-amber-200" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDk49_9OrwvpLFCvXO1rSA5-ULMbuTGK9Mq53fpnENtAj_7TyxqNPorJ5gs7IQbPnx6YggK_BiJIH3amcjN3E0teFo4KJXkT_7cynfHmHbrevtKkW7oAORsxyJseIodAcgykcNkbU7xvafmvsIOYfZtgFqBqBAskhd_pym4VrrkiPZDXUNmGjSqjimgL-KpAAqIUH99b7jLeCSFgLxqqLoh1X76jRqzKba7IdT13AYeRIev9JF_MoC3qhDfzJznzW1_d0TqMGoLPt3M"/>
+          <div class="ml-3 flex-grow">
+            <h4 class="text-sm font-bold">Andi Wijaya</h4>
+            <p class="text-[10px] text-gray-500">22 Des 2023 • 15:45 WIB</p>
+          </div>
+          <span class="text-[9px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-bold uppercase tracking-tighter">Pending</span>
+        </div>
+      </div>
+    </div>
+    <!-- Nostalgia Gallery -->
+    <div class="glass-card p-6 rounded-xl shadow-sm col-span-1">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-bold text-gray-800">Galeri Nostalgia</h3>
+        <button class="text-[10px] text-gray-500 uppercase">Upload Foto</button>
+      </div>
+      <div class="grid grid-cols-2 gap-2 mb-4">
+        <div class="aspect-square bg-gray-300 rounded overflow-hidden border-2 border-amber-100 shadow-sm">
+          <img alt="Memory 1" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCFMIznG07orug4CUAhI9aPZowcKtu_xr7kMa3yLpy9KFAwYandVcyXVKj5gYIugk25dgL53P40JxJl-ZGAEmyiIOg61eQ7TTadQC5FJA5uHTveA0YdfoarL2F8EHOJkQsuvrl_PQnRmJ-wuJfSxn0fs2m2mwBZfXXIGhviUzD4rX2aUy9CWC-BAHcA3UD-nJFdBFoTEnYsAuv-Hh9yMnJ4YrYz9P6mqUYq-kEmlthpm8mVJpW4CEkaUG8Txyld2XePGkuJDkNAZikI"/>
+        </div>
+        <div class="aspect-square bg-gray-300 rounded overflow-hidden border-2 border-amber-100 shadow-sm">
+          <img alt="Memory 2" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCfmudprd8jeqAApxnXTjaunm2H5J14bxqO2U6UrHhLHAked3bwj_alIufMzGD0rx9QApyoPCha9OV0tVFLm2vJ8hU4ZRBl4UeqI9830rHhL2jBcLx4wBLs66DftzYpMuAzbOY8JMEhrNAoCMkeCYQhzusSU46IUYptb7n7JiMIssFasflsVXt4ddFcclx7M7WSc5zEJvL1An4M4u3GHOstS1-OYoU54DOzgOYN30-Cg1cYw_VzVNc1nOBoOEsBIWlCOCJc_PE_cXA3"/>
+        </div>
+      </div>
+      <p class="text-[10px] text-gray-500 italic text-center mb-2">"Kalo, ingat dulu kita sering nongkrong di kantin..."</p>
+      <div class="text-center">
+        <span class="text-[9px] text-gray-400 font-mono">- Bambang S.</span>
+      </div>
+    </div>
+    <!-- Merchandise Shop -->
+    <!-- FIX 3: Changed CTA buttons from "Donasi" to "Pesan Sekarang" -->
+    <div class="glass-card p-6 rounded-xl shadow-sm col-span-1">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-bold text-gray-800">Merchandise</h3>
+        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+      </div>
+      <div class="space-y-4">
+        <div class="flex items-center space-x-3">
+          <div class="w-14 h-14 bg-amber-50 rounded flex items-center justify-center border border-amber-200 p-1 shrink-0">
+            <img alt="Tumbler" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA8dxTPQXsO40viXviIAfm81mQrOrlEje33gtVBZ0OlJNkKn8VkrTTzGWTrBvYQMtTnjfiuKLu8ZbOZDKjwmV3NAJxtdNIVCDrskzPowWY4F3TkhKzwA4jco7QBpuWq3p1FK7qKP3ZW9fEZac3qm4-hZKmF31rrV1pEadt2mk3b5PM6rF6WOQTvGmN0-BH6fbSuoryzTM826SvDjut03YsfUyxYfUFJBJQ1HNsRP1_Ouc0WZAxLke5IGoXp1p_nD11wgkkeOGpwoJdK"/>
+          </div>
+          <div class="flex-grow">
+            <h4 class="text-[11px] font-bold">Tumbler Premium TOP87</h4>
+            <p class="text-[10px] text-gray-500">Rp 125.000 / unit</p>
+            <button class="w-full mt-1 bg-orange-600 text-white py-1 rounded text-[9px] font-bold uppercase">Pesan Sekarang</button>
+          </div>
+        </div>
+        <div class="flex items-center space-x-3">
+          <div class="w-14 h-14 bg-amber-50 rounded flex items-center justify-center border border-amber-200 p-1 shrink-0">
+            <img alt="Kaos" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcLWhmnTrWQKjboxk9FHDnI8cwoP1TQx90M8ZT2-U44zUqdxxQncKwVy4LcLThDGHnGLoBlSiA5WkNeTk-6Eoe1B9R14RHlWXA-0kxfYI6FzANSZHsewzKfxHqx60Ty3FVrYMtSt3xLIQi_v-38lMPbsNK1L2Epw3s1sh621FoDowjmFzu7yRKbHHzWSlA3Ng6MqXlCDdPZGMPXTuQmrMTKv8blsyBApJ-IoNdFBzjpB4ai4QUT62hWjFCV_gm"/>
+          </div>
+          <div class="flex-grow">
+            <h4 class="text-[11px] font-bold">Kaos Reuni Bahan Adem</h4>
+            <p class="text-[10px] text-gray-500">Rp 150.000 / unit</p>
+            <button class="w-full mt-1 bg-orange-600 text-white py-1 rounded text-[9px] font-bold uppercase">Pesan Sekarang</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- END: MiddleGrid -->
+
+  <!-- BEGIN: BottomContentGrid -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Transparency Budget Table -->
+    <div class="glass-card p-6 rounded-xl shadow-sm lg:col-span-2">
+      <div class="flex justify-between items-center mb-6">
+        <h3 class="font-bold text-gray-800 text-xl serif-font">Rincian Anggaran (Transparansi)</h3>
+        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-amber-200">
+              <th class="py-2 font-medium text-gray-500 w-12">No</th>
+              <th class="py-2 font-medium text-gray-500">Keterangan</th>
+              <th class="py-2 font-medium text-gray-500 text-right">Total Biaya</th>
+              <th class="py-2 font-medium text-gray-500 text-right">Per Orang</th>
+            </tr>
+          </thead>
+          <tbody class="text-gray-800">
+            <tr class="border-b border-amber-100">
+              <td class="py-4">1</td>
+              <td class="py-4 font-medium">Akomodasi &amp; Konsumsi Resort</td>
+              <td class="py-4 text-right">Rp 105.230.000</td>
+              <td class="py-4 text-right">Rp 863.000</td>
+            </tr>
+            <tr class="border-b border-amber-100">
+              <td class="py-4">2</td>
+              <td class="py-4 font-medium">Lunch Hari Pertama (Prasmanan Sunda)</td>
+              <td class="py-4 text-right">Rp 15.258.000</td>
+              <td class="py-4 text-right">Rp 125.000</td>
+            </tr>
+            <tr class="border-b border-amber-100">
+              <td class="py-4">3</td>
+              <td class="py-4 font-medium">Outdoor Activity &amp; Games</td>
+              <td class="py-4 text-right">Rp 25.620.000</td>
+              <td class="py-4 text-right">Rp 210.000</td>
+            </tr>
+            <tr class="font-bold text-gray-900 bg-amber-50">
+              <td class="py-4 px-2" colspan="2">TOTAL ANGGARAN REUNI</td>
+              <td class="py-4 text-right">Rp 246.108.000</td>
+              <td class="py-4 text-right">Rp 2.017.000</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-4 flex items-start space-x-2">
+        <svg class="w-4 h-4 text-gold shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path clip-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" fill-rule="evenodd"></path></svg>
+        <p class="text-[10px] text-gray-500 italic">Target dana terkumpul Rp 247.000.000. Selisih dana akan dialokasikan untuk Dana Sosial/Beasiswa &amp; Yatim.</p>
+      </div>
+    </div>
+    <!-- Right Column Widgets -->
+    <div class="space-y-6">
+      <!-- Announcements -->
+      <div class="glass-card p-6 rounded-xl shadow-sm">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="font-bold text-gray-800">Pengumuman</h3>
+          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+        </div>
+        <div class="space-y-4">
+          <div class="border-l-4 border-gold pl-3">
+            <h4 class="text-xs font-bold text-gray-900 uppercase">Kostum Hari Ke-1: Putih</h4>
+            <p class="text-[10px] text-gray-600">Ayo seragamkan dresscode agar dokumentasi terlihat kompak!</p>
+          </div>
+          <div class="border-l-4 border-amber-200 pl-3">
+            <h4 class="text-xs font-bold text-gray-900 uppercase">Pembayaran Cicilan Ke-2</h4>
+            <p class="text-[10px] text-gray-600">Mohon segera dilunasi sebelum tgl 12 Feb 2024 untuk konfirmasi akomodasi.</p>
+          </div>
+        </div>
+        <button class="w-full mt-4 text-[10px] text-center text-gray-500 font-bold uppercase tracking-wider">Lihat Semua Pengumuman</button>
+      </div>
+      <!-- Bantu Teman Angkatan -->
+      <!-- FIX 4: Changed CTA from "Pesan Sekarang" to "Donasi Sekarang" -->
+      <div class="glass-card p-6 rounded-xl shadow-sm">
+        <h3 class="font-bold text-gray-800 mb-4">Bantu Teman Angkatan</h3>
+        <p class="text-sm text-gray-700 leading-relaxed mb-4">
+          Masih ada teman kita yang kesulitan biaya untuk hadir. Bantu mereka dengan kontribusi sukarela.
+        </p>
+        <div class="bg-orange-50 p-3 rounded-lg mb-4">
+          <div class="flex justify-between text-[11px] mb-1">
+            <span>Target: 5 Alumni</span>
+            <span class="font-bold text-orange-700">3 Terbantu</span>
+          </div>
+          <div class="w-full bg-orange-200 h-1.5 rounded-full overflow-hidden">
+            <div class="bg-orange-500 h-full w-[60%]"></div>
+          </div>
+        </div>
+        <button class="w-full btn-primary py-2.5 rounded font-bold text-sm shadow-md">Donasi Sekarang</button>
+      </div>
+    </div>
+  </div>
+  <!-- END: BottomContentGrid -->
+
+  <!-- BEGIN: Footer -->
+  <footer class="mt-12 pt-8 border-t border-amber-200">
+    <div class="flex flex-col items-center justify-center text-center">
+      <div class="flex items-center space-x-2 text-green-900 mb-4 serif-font text-2xl italic font-bold">
+        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C11.3 2 10.7 2.1 10.1 2.3C9.5 2.5 9 2.7 8.5 3C8 3.3 7.6 3.6 7.2 4C6.1 4.9 5.3 6.1 5 7.4C5 7.6 5 7.8 5 8C5 10.8 7.2 13 10 13H11V18H10V20H14V18H13V13H14C16.8 13 19 10.8 19 8C19 7.8 19 7.6 19 7.4C18.7 6.1 17.9 4.9 16.8 4C16.4 3.6 16 3.3 15.5 3C15 2.7 14.5 2.5 13.9 2.3C13.3 2.1 12.7 2 12 2ZM10.5 5C10.8 5 11 5.2 11 5.5V9.5C11 9.8 10.8 10 10.5 10C10.2 10 10 9.8 10 9.5V5.5C10 5.2 10.2 5 10.5 5ZM13.5 5C13.8 5 14 5.2 14 5.5V9.5C14 9.8 13.8 10 13.5 10C13.2 10 13 9.8 13 9.5V5.5C13 5.2 13.2 5 13.5 5Z"></path></svg>
+        <span>Dari kita, oleh kita, untuk kita</span>
+      </div>
+      <div class="flex flex-col md:flex-row md:justify-between w-full text-[10px] text-gray-500 uppercase tracking-widest mt-8">
+        <p>TOP87 &copy; 2024 Panitia Reuni TOP87. All rights reserved.</p>
+        <div class="flex space-x-4 mt-4 md:mt-0">
+          <span>Instagram</span>
+          <span>WhatsApp</span>
+          <span>Email</span>
+          <span>Hubungi Panitia</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+  <!-- END: Footer -->
+
+</main>
+<!-- END: MainContent -->
+</body>
+</html>

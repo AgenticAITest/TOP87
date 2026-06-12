@@ -24,15 +24,22 @@ import Pending      from './pages/Pending';
 import AuthCallback from './pages/AuthCallback';
 import NotFound     from './pages/NotFound';
 
-import Dashboard    from './pages/admin/Dashboard';
-import AdminMembers from './pages/admin/AdminMembers';
-import AdminMedia   from './pages/admin/AdminMedia';
-import AdminCMS     from './pages/admin/AdminCMS';
-import SiteAdmin    from './pages/admin/SiteAdmin';
-import ContentAdmin from './pages/admin/ContentAdmin';
-import SiteCMSAdmin from './pages/admin/SiteCMSAdmin';
-import AllMembers   from './pages/admin/AllMembers';
-import AdminRoles   from './pages/admin/AdminRoles';
+import Dashboard      from './pages/admin/Dashboard';
+import AdminMembers   from './pages/admin/AdminMembers';
+import AdminMedia     from './pages/admin/AdminMedia';
+import AdminCMS       from './pages/admin/AdminCMS';
+import SiteAdmin      from './pages/admin/SiteAdmin';
+import ContentAdmin   from './pages/admin/ContentAdmin';
+import SiteCMSAdmin   from './pages/admin/SiteCMSAdmin';
+import AllMembers     from './pages/admin/AllMembers';
+import AdminRoles     from './pages/admin/AdminRoles';
+import AdminPayments         from './pages/admin/AdminPayments';
+import AdminMerchandise      from './pages/admin/AdminMerchandise';
+import AdminOrders           from './pages/admin/AdminOrders';
+import AdminFinancialReport  from './pages/admin/AdminFinancialReport';
+import PaymentsPage     from './pages/PaymentsPage';
+import MerchandisePage  from './pages/MerchandisePage';
+import MyOrdersPage     from './pages/MyOrdersPage';
 
 function RootRoute() {
   const { user, loading } = useAuth();
@@ -77,6 +84,9 @@ export default function App() {
           <Route path="/submit"      element={<ProtectedRoute requireApproved><SubmitMedia /></ProtectedRoute>} />
           <Route path="/profile"     element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
           <Route path="/members/:id" element={<ProtectedRoute requireApproved><MemberProfile /></ProtectedRoute>} />
+          <Route path="/payments"     element={<ProtectedRoute requireApproved><PaymentsPage /></ProtectedRoute>} />
+          <Route path="/merchandise" element={<ProtectedRoute requireApproved><MerchandisePage /></ProtectedRoute>} />
+          <Route path="/orders"      element={<ProtectedRoute requireApproved><MyOrdersPage /></ProtectedRoute>} />
         </Route>
 
         {/* Admin routes */}
@@ -89,8 +99,12 @@ export default function App() {
           <Route path="content"     element={<ContentAdmin />} />
           <Route path="site-cms"    element={<SiteCMSAdmin />} />
           <Route path="all-members" element={<AllMembers />} />
-          <Route path="roles"       element={<AdminRoles />} />
-          <Route path="*"          element={<Navigate to="/admin" replace />} />
+          <Route path="roles"            element={<AdminRoles />} />
+          <Route path="payments"        element={<AdminPayments />} />
+          <Route path="merchandise"     element={<AdminMerchandise />} />
+          <Route path="orders"          element={<AdminOrders />} />
+          <Route path="financial"       element={<AdminFinancialReport />} />
+          <Route path="*"           element={<Navigate to="/admin" replace />} />
         </Route>
 
         <Route path="*" element={<MainLayout />}>

@@ -1,5 +1,9 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { corsHeaders } from '../_shared/cors.ts';
+import { createClient } from 'npm:@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -51,7 +55,7 @@ Deno.serve(async (req) => {
       .eq('id', userId)
       .single();
 
-    // Write audit log first — so there's a record even if deletion fails
+    // Write audit log first — record exists even if deletion fails
     await adminClient.from('audit_log').insert({
       action:    'member_hard_deleted',
       actor_id:  caller.id,
@@ -59,7 +63,7 @@ Deno.serve(async (req) => {
       details:   { deleted_name: target?.name ?? 'unknown', reason: 'admin_hard_delete' },
     });
 
-    // Delete profile row first (cascades to charter_members, profile_friends, media, etc.)
+    // Delete profile row first (cascades to charter_members, profile_friends, etc.)
     await adminClient.from('profiles').delete().eq('id', userId);
 
     // Hard-delete the auth user (requires service role)

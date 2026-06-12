@@ -8,7 +8,7 @@ import { qk, fetchCharters } from '../lib/queries';
 
 const ATTENDANCE_OPTIONS = [
   { value: 'yes',         label: 'Ya, aku hadir!',        color: 'text-green-700 bg-green-50 border-green-300' },
-  { value: 'most_likely', label: 'InshaAllah hadir',       color: 'text-blue-700  bg-blue-50  border-blue-300' },
+  { value: 'most_likely', label: 'Berencana Hadir',         color: 'text-blue-700  bg-blue-50  border-blue-300' },
   { value: 'undecided',   label: 'Belum tahu',             color: 'text-yellow-700 bg-yellow-50 border-yellow-300' },
   { value: 'no',          label: 'Tidak bisa hadir',       color: 'text-red-600   bg-red-50   border-red-300' },
 ] as const;

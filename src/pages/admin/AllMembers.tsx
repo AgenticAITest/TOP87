@@ -35,7 +35,7 @@ type AttendanceFilter = 'all' | 'yes' | 'most_likely' | 'undecided' | 'no' | 'no
 
 const ATTENDANCE_LABELS: Record<string, string> = {
   yes:         'Hadir',
-  most_likely: 'InshaAllah',
+  most_likely: 'Berencana Hadir',
   undecided:   'Belum Tahu',
   no:          'Tidak Bisa',
 };
@@ -177,7 +177,7 @@ export default function AllMembers() {
           className="bg-zinc-900 border border-white/10 rounded-full px-4 py-2 text-sm text-gray-300 focus:outline-none focus:border-gold/50 transition-colors">
           <option value="all">All Attendance</option>
           <option value="yes">Hadir</option>
-          <option value="most_likely">InshaAllah</option>
+          <option value="most_likely">Berencana Hadir</option>
           <option value="undecided">Belum Tahu</option>
           <option value="no">Tidak Bisa</option>
           <option value="none">Belum Isi</option>

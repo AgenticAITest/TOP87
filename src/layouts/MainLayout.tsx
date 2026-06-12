@@ -3,12 +3,13 @@ import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Receipt, ShoppingBag, Heart, Megaphone, HelpCircle,
   Users, Image as ImageIcon, MapPin, BookOpen, Bell, LogOut, Menu, X,
-  ShieldCheck, Info,
+  ShieldCheck, Info, CircleHelp,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminStatus } from '../hooks/useAdminStatus';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import Footer from '../components/Footer';
+import HelpModal from '../components/HelpModal';
 
 const coreNav = [
   { to: '/home',       label: 'Dashboard',               icon: LayoutDashboard, end: true  },
@@ -188,6 +189,8 @@ function SidebarInner({ onClose }: { onClose?: () => void }) {
 
 export default function MainLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [helpOpen,   setHelpOpen]   = useState(false);
+  const { isSuperAdmin, isAdmin: isCharterAdmin } = useAdminStatus();
 
   return (
     <div className="flex min-h-screen">
@@ -232,6 +235,22 @@ export default function MainLayout() {
         <Outlet />
         <Footer />
       </main>
+
+      {/* Floating help button */}
+      <button
+        onClick={() => setHelpOpen(true)}
+        className="fixed bottom-6 right-6 z-40 w-10 h-10 rounded-full bg-gold/10 border border-gold/30 text-gold hover:bg-gold/20 transition-all flex items-center justify-center shadow-lg"
+        title="Panduan Pengguna"
+      >
+        <CircleHelp size={18} />
+      </button>
+
+      <HelpModal
+        isOpen={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        isSuperAdmin={isSuperAdmin}
+        isCharterAdmin={isCharterAdmin && !isSuperAdmin}
+      />
     </div>
   );
 }

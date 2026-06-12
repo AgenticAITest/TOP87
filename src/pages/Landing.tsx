@@ -195,7 +195,7 @@ export default function Landing() {
               </div>
               <div className="text-center">
                 <p className="text-sm font-bold text-blue-600">{dashboard.attendance.most_likely}</p>
-                <p className="text-[9px] text-gray-500 leading-tight">InshaAllah</p>
+                <p className="text-[9px] text-gray-500 leading-tight">Berencana Hadir</p>
               </div>
               <div className="text-center">
                 <p className="text-sm font-bold text-yellow-600">{dashboard.attendance.undecided}</p>
@@ -217,7 +217,7 @@ export default function Landing() {
           </Link>
         </div>
 
-        {/* Total Dana Terkumpul — Phase 2 empty state */}
+        {/* Total Dana Terkumpul */}
         <div className="glass-card p-6 rounded-xl shadow-sm">
           <div className="flex items-center mb-4">
             <div className="p-2 bg-orange-100 rounded text-orange-700 mr-3">
@@ -227,18 +227,57 @@ export default function Landing() {
             </div>
             <h3 className="font-bold text-gray-800">Total Dana Terkumpul</h3>
           </div>
-          <p className="text-3xl font-bold text-gray-400 mb-2">Rp 0</p>
-          <p className="text-xs text-gray-500 italic leading-relaxed">
-            Pembayaran belum dibuka. Fitur ini akan aktif segera.
-          </p>
-          <div className="mt-8 flex space-x-2 opacity-30">
-            <div className="h-1 bg-orange-200 flex-grow rounded" />
-            <div className="h-1 bg-orange-400 flex-grow rounded" />
-            <div className="h-1 bg-orange-600 flex-grow rounded" />
-          </div>
+          {flags?.donations ? (
+            <>
+              {(() => {
+                const reunionFee   = dashboard?.totalDana?.reunion_fee        ?? 0;
+                const donation     = dashboard?.totalDana?.donation            ?? 0;
+                const merchMargin  = dashboard?.totalDana?.merchandise_margin  ?? 0;
+                const grandTotal   = reunionFee + donation + (flags?.merchandise ? merchMargin : 0);
+                return (
+                  <>
+                    <p className="text-3xl font-bold text-gray-900 mb-1">
+                      Rp {grandTotal.toLocaleString('id-ID')}
+                    </p>
+                    <div className="space-y-1 text-[11px] text-gray-500 mb-4">
+                      <div className="flex justify-between">
+                        <span>Iuran Reuni</span>
+                        <span className="font-medium text-gray-700">Rp {reunionFee.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Donasi</span>
+                        <span className="font-medium text-gray-700">Rp {donation.toLocaleString('id-ID')}</span>
+                      </div>
+                      {flags?.merchandise && merchMargin > 0 && (
+                        <div className="flex justify-between">
+                          <span>Margin Merchandise</span>
+                          <span className="font-medium text-gray-700">Rp {merchMargin.toLocaleString('id-ID')}</span>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+              <Link to="/payments" className="btn-primary w-full py-2 rounded text-sm font-bold flex items-center justify-center gap-2">
+                Bayar Sekarang
+              </Link>
+            </>
+          ) : (
+            <>
+              <p className="text-3xl font-bold text-gray-400 mb-2">Rp 0</p>
+              <p className="text-xs text-gray-500 italic leading-relaxed">
+                Pembayaran belum dibuka. Fitur ini akan aktif segera.
+              </p>
+              <div className="mt-8 flex space-x-2 opacity-30">
+                <div className="h-1 bg-orange-200 flex-grow rounded" />
+                <div className="h-1 bg-orange-400 flex-grow rounded" />
+                <div className="h-1 bg-orange-600 flex-grow rounded" />
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Merchandise Terpesan — Phase 3 empty state */}
+        {/* Merchandise Terpesan */}
         <div className="glass-card p-6 rounded-xl shadow-sm">
           <div className="flex items-center mb-4">
             <div className="p-2 bg-yellow-100 rounded text-yellow-700 mr-3">
@@ -248,11 +287,36 @@ export default function Landing() {
             </div>
             <h3 className="font-bold text-gray-800">Merchandise Terpesan</h3>
           </div>
-          <p className="text-sm text-gray-400 italic">Merchandise belum tersedia.</p>
-          <p className="text-xs text-gray-400 mt-2">Katalog merchandise akan segera hadir.</p>
-          <div className="pt-3 border-t border-amber-100 mt-8">
-            <p className="text-[11px] text-gray-400 italic">Fitur aktif di fase berikutnya.</p>
-          </div>
+          {flags?.merchandise ? (
+            <>
+              <p className="text-3xl font-bold font-serif text-gray-900 mb-1">
+                {dashboard?.merchandiseTotals?.confirmed ?? 0}
+                <span className="text-base font-normal text-gray-500 ml-1">item</span>
+              </p>
+              <p className="text-xs text-gray-500 mb-4">
+                terkonfirmasi
+                {(dashboard?.merchandiseTotals?.pending ?? 0) > 0 && (
+                  <span className="ml-2 text-yellow-600">
+                    · {dashboard!.merchandiseTotals.pending} menunggu
+                  </span>
+                )}
+              </p>
+              <Link
+                to="/merchandise"
+                className="btn-primary w-full py-2 rounded text-sm font-bold flex items-center justify-center gap-2"
+              >
+                Lihat Katalog
+              </Link>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-gray-400 italic">Merchandise belum tersedia.</p>
+              <p className="text-xs text-gray-400 mt-2">Katalog merchandise akan segera hadir.</p>
+              <div className="pt-3 border-t border-amber-100 mt-8">
+                <p className="text-[11px] text-gray-400 italic">Fitur aktif di fase berikutnya.</p>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -321,7 +385,16 @@ export default function Landing() {
                   );
                 })}
               </div>
-              <p className="text-[10px] text-gray-500 italic text-center">"Kenangan indah bersama sahabat..."</p>
+              {dashboard?.latestComment ? (
+                <div className="bg-amber-50/60 rounded-lg p-3 border border-amber-100">
+                  <p className="text-[11px] text-gray-600 italic leading-relaxed line-clamp-2">
+                    "{dashboard.latestComment.body}"
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-1">— {dashboard.latestComment.profileName}</p>
+                </div>
+              ) : (
+                <p className="text-[10px] text-gray-500 italic text-center">"Kenangan indah bersama sahabat..."</p>
+              )}
             </>
           ) : (
             <div className="flex flex-col items-center justify-center py-4 text-center">
@@ -335,25 +408,145 @@ export default function Landing() {
           )}
         </div>
 
-        {/* Merchandise preview — Phase 3 placeholder */}
+        {/* Merchandise preview */}
         <div className="glass-card p-6 rounded-xl shadow-sm">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-gray-800">Merchandise</h3>
-            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-            </svg>
-          </div>
-          <div className="flex flex-col items-center justify-center py-6 text-center">
-            <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center border-2 border-amber-200 mb-4">
-              <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {flags?.merchandise && isApproved ? (
+              <Link to="/merchandise" className="text-[10px] text-gray-500 uppercase hover:text-gray-700 transition-colors">
+                Lihat Semua
+              </Link>
+            ) : (
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
               </svg>
-            </div>
-            <p className="text-sm font-medium text-gray-600 font-serif">Segera Hadir</p>
-            <p className="text-xs text-gray-400 mt-1">Kaos, Tumbler, Topi — edisi terbatas TOP87</p>
+            )}
           </div>
+          {flags?.merchandise && (dashboard?.topMerchandise ?? []).length > 0 ? (
+            <div className="space-y-3">
+              {(dashboard!.topMerchandise).map(item => (
+                <div key={item.id} className="flex items-center gap-3">
+                  {item.image_url ? (
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      className="w-10 h-10 rounded-lg object-cover border border-amber-100 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0">
+                      <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                      </svg>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-gray-900 truncate">{item.name}</p>
+                    <p className="text-[10px] text-gray-500">
+                      Rp {item.price.toLocaleString('id-ID')}
+                      {item.stock_remaining <= 5 && item.stock_remaining > 0 && (
+                        <span className="ml-1 text-orange-500">{item.stock_remaining} tersisa</span>
+                      )}
+                      {item.stock_remaining === 0 && (
+                        <span className="ml-1 text-red-500">Habis</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {isApproved && (
+                <Link
+                  to="/merchandise"
+                  className="btn-primary w-full mt-2 py-2 rounded text-sm font-bold flex items-center justify-center gap-2"
+                >
+                  Pesan Sekarang
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center border-2 border-amber-200 mb-4">
+                <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                </svg>
+              </div>
+              <p className="text-sm font-medium text-gray-600 font-serif">Segera Hadir</p>
+              <p className="text-xs text-gray-400 mt-1">Kaos, Tumbler, Topi — edisi terbatas TOP87</p>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ── Progress / Countdown Widgets ─────────────────────────────────── */}
+      {(flags?.donations || flags?.merchandise) && (
+        <div className="glass-card p-6 rounded-xl shadow-sm mb-8">
+          <h3 className="font-bold text-gray-800 font-serif text-lg mb-5">Progress Reuni</h3>
+          <div className="space-y-5">
+
+            {/* Dana Terkumpul */}
+            {flags?.donations && (() => {
+              const dana        = (dashboard?.totalDana?.reunion_fee ?? 0)
+                                + (dashboard?.totalDana?.donation ?? 0)
+                                + (flags.merchandise ? (dashboard?.totalDana?.merchandise_margin ?? 0) : 0);
+              const target      = dashboard?.budgetTarget ?? 247_000_000;
+              const pct         = target > 0 ? Math.min(Math.round((dana / target) * 100), 100) : 0;
+              return (
+                <div>
+                  <div className="flex justify-between items-baseline mb-1.5">
+                    <span className="text-xs font-bold text-gray-700">Dana Terkumpul</span>
+                    <span className="text-xs text-gray-500">
+                      Rp {dana.toLocaleString('id-ID')}
+                      <span className="text-gray-400"> / Rp {target.toLocaleString('id-ID')}</span>
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="h-3 rounded-full transition-all"
+                      style={{
+                        width: `${pct}%`,
+                        background: 'linear-gradient(to right, #c67119, #a35a12)',
+                      }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-1 text-right">{pct}% dari target</p>
+                </div>
+              );
+            })()}
+
+            {/* Merchandise Stock per item */}
+            {flags?.merchandise && (dashboard?.topMerchandise ?? []).length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-gray-700 mb-3">Stok Merchandise</p>
+                <div className="space-y-2.5">
+                  {dashboard!.topMerchandise.map(item => {
+                    const sold = item.stock_total - item.stock_remaining;
+                    const pct  = item.stock_total > 0
+                      ? Math.min(Math.round((sold / item.stock_total) * 100), 100)
+                      : 0;
+                    return (
+                      <div key={item.id}>
+                        <div className="flex justify-between items-baseline mb-1">
+                          <span className="text-[11px] text-gray-700 truncate max-w-[60%]">{item.name}</span>
+                          <span className="text-[10px] text-gray-500">
+                            {item.stock_remaining > 0
+                              ? <>{item.stock_remaining} tersisa</>
+                              : <span className="text-red-500">Habis</span>}
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                          <div
+                            className="h-2 rounded-full transition-all bg-amber-400"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Bottom Grid ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

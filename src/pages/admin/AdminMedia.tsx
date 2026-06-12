@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Check, X, Play, ImageIcon, ExternalLink } from 'lucide-react';
+import { Check, X, Play, ImageIcon, ExternalLink, MessageSquare } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
 import { qk, fetchAdminMedia } from '../../lib/queries';
 import { resolveMediaUrl } from '../../lib/storage';
+import MediaComments from '../../components/MediaComments';
 
 type StatusFilter = 'pending' | 'approved' | 'rejected';
 
@@ -42,7 +43,8 @@ export default function AdminMedia() {
   const { isSuperAdmin, charterIds, loading: adminLoading } = useAdminStatus();
   const queryClient = useQueryClient();
 
-  const [filter, setFilter] = useState<StatusFilter>('pending');
+  const [filter,           setFilter]           = useState<StatusFilter>('pending');
+  const [expandedComments, setExpandedComments] = useState<string | null>(null);
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: qk.adminMedia(filter, isSuperAdmin, charterIds),
@@ -152,11 +154,33 @@ export default function AdminMedia() {
                         </button>
                       </div>
                     ) : (
-                      <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full ${STATUS_STYLES[item.status as StatusFilter] ?? 'text-gray-400'}`}>
-                        {item.status}
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full ${STATUS_STYLES[item.status as StatusFilter] ?? 'text-gray-400'}`}>
+                          {item.status}
+                        </span>
+                        {item.status === 'approved' && (
+                          <button
+                            onClick={() => setExpandedComments(expandedComments === item.id ? null : item.id)}
+                            className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg transition-colors ${
+                              expandedComments === item.id
+                                ? 'bg-gold/15 text-gold'
+                                : 'text-gray-500 hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                            <MessageSquare size={11} />
+                            <span>Komentar</span>
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
+
+                  {/* Inline comment section for approved items */}
+                  {item.status === 'approved' && expandedComments === item.id && (
+                    <div className="mt-3 pt-3 border-t border-white/10">
+                      <MediaComments mediaId={item.id} variant="dark" />
+                    </div>
+                  )}
                 </div>
               </motion.div>
             );

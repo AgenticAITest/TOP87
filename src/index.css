@@ -87,4 +87,63 @@
   .btn-secondary:hover {
     background-color: #1a4a35;
   }
+
+  /* ── Help / Panduan prose ─────────────────────────────── */
+  .help-prose h1 {
+    @apply text-2xl font-bold font-serif text-gold mb-4 mt-2;
+  }
+  .help-prose h2 {
+    @apply text-lg font-bold font-serif text-white mt-8 mb-3 pb-2 border-b border-white/10;
+  }
+  .help-prose h3 {
+    @apply text-sm font-bold text-gold/80 uppercase tracking-widest mt-5 mb-2;
+  }
+  .help-prose h4 {
+    @apply text-sm font-semibold text-gray-300 mt-4 mb-1;
+  }
+  .help-prose p {
+    @apply text-sm text-gray-300 leading-relaxed mb-3;
+  }
+  .help-prose ul {
+    @apply list-disc list-outside pl-5 mb-3 space-y-1;
+  }
+  .help-prose ol {
+    @apply list-decimal list-outside pl-5 mb-3 space-y-1;
+  }
+  .help-prose li {
+    @apply text-sm text-gray-300 leading-relaxed;
+  }
+  .help-prose strong {
+    @apply font-semibold text-white;
+  }
+  .help-prose code {
+    @apply text-xs font-mono bg-black/30 text-gold/80 px-1.5 py-0.5 rounded;
+  }
+  .help-prose pre {
+    @apply bg-black/30 rounded-xl p-4 mb-4 overflow-x-auto;
+  }
+  .help-prose pre code {
+    @apply bg-transparent px-0 py-0 text-gray-300;
+  }
+  .help-prose blockquote {
+    @apply border-l-2 border-gold/40 pl-4 my-3 text-gray-400 italic text-sm;
+  }
+  .help-prose hr {
+    @apply border-white/10 my-6;
+  }
+  .help-prose table {
+    @apply w-full text-sm border-collapse mb-4;
+  }
+  .help-prose thead tr {
+    @apply border-b border-white/10;
+  }
+  .help-prose th {
+    @apply text-left text-[10px] uppercase tracking-widest text-gray-500 font-normal pb-2 pr-4;
+  }
+  .help-prose td {
+    @apply py-1.5 pr-4 text-gray-300 border-b border-white/5 align-top;
+  }
+  .help-prose a {
+    @apply text-gold/80 underline underline-offset-2 hover:text-gold transition-colors;
+  }
 }

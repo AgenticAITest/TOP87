@@ -1,26 +1,33 @@
+import { useState } from 'react';
 import { Outlet, NavLink, Link, Navigate } from 'react-router-dom';
-import { Users, Image, LayoutDashboard, FileText, Globe, ChevronRight, LogOut, BookOpen, ShieldCheck, PenSquare } from 'lucide-react';
+import { Users, Image, LayoutDashboard, FileText, Globe, ChevronRight, LogOut, BookOpen, ShieldCheck, PenSquare, CreditCard, ShoppingBag, Package, BarChart3, CircleHelp } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminStatus } from '../hooks/useAdminStatus';
+import HelpModal from '../components/HelpModal';
 
 const adminLinks = [
-  { to: '/admin',         label: 'Dashboard',   icon: LayoutDashboard, end: true  },
-  { to: '/admin/members', label: 'Members',      icon: Users,           end: false },
-  { to: '/admin/media',   label: 'Media Queue',  icon: Image,           end: false },
-  { to: '/admin/cms',     label: 'Charter CMS',  icon: FileText,        end: false },
+  { to: '/admin',            label: 'Dashboard',   icon: LayoutDashboard, end: true  },
+  { to: '/admin/members',    label: 'Members',      icon: Users,           end: false },
+  { to: '/admin/media',      label: 'Media Queue',  icon: Image,           end: false },
+  { to: '/admin/cms',        label: 'Charter CMS',  icon: FileText,        end: false },
+  { to: '/admin/payments',     label: 'Pembayaran',   icon: CreditCard,   end: false },
+  { to: '/admin/merchandise',  label: 'Merchandise',  icon: ShoppingBag,  end: false },
+  { to: '/admin/orders',       label: 'Pesanan',      icon: Package,      end: false },
 ];
 
 const superAdminLinks = [
-  { to: '/admin/site',        label: 'Site Settings', icon: Globe,        end: false },
-  { to: '/admin/site-cms',    label: 'Site CMS',      icon: PenSquare,    end: false },
-  { to: '/admin/content',     label: 'Content',       icon: BookOpen,     end: false },
-  { to: '/admin/all-members', label: 'All Members',   icon: Users,        end: false },
-  { to: '/admin/roles',       label: 'Admin Roles',   icon: ShieldCheck,  end: false },
+  { to: '/admin/site',        label: 'Site Settings',  icon: Globe,       end: false },
+  { to: '/admin/site-cms',    label: 'Site CMS',       icon: PenSquare,   end: false },
+  { to: '/admin/content',     label: 'Content',        icon: BookOpen,    end: false },
+  { to: '/admin/all-members', label: 'All Members',    icon: Users,       end: false },
+  { to: '/admin/roles',       label: 'Admin Roles',    icon: ShieldCheck, end: false },
+  { to: '/admin/financial',   label: 'Lap. Keuangan',  icon: BarChart3,   end: false },
 ];
 
 export default function AdminLayout() {
   const { user, profile, signOut } = useAuth();
   const { isAdmin, isSuperAdmin, loading } = useAdminStatus();
+  const [helpOpen, setHelpOpen] = useState(false);
 
   if (loading) {
     return (
@@ -99,6 +106,13 @@ export default function AdminLayout() {
               ← Site
             </Link>
             <button
+              onClick={() => setHelpOpen(true)}
+              className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-gray-600 hover:text-gold transition-colors py-1 px-2"
+              title="Panduan Pengguna"
+            >
+              <CircleHelp size={10} /> Help
+            </button>
+            <button
               onClick={signOut}
               className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-gray-600 hover:text-red-400 transition-colors py-1 px-2"
             >
@@ -112,6 +126,13 @@ export default function AdminLayout() {
       <div className="flex-1 ml-60 min-h-screen">
         <Outlet />
       </div>
+
+      <HelpModal
+        isOpen={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        isSuperAdmin={isSuperAdmin}
+        isCharterAdmin={isAdmin && !isSuperAdmin}
+      />
     </div>
   );
 }

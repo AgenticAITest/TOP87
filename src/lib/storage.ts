@@ -101,4 +101,15 @@ async function uploadToVPS(
   });
 }
 
+// Upload a payment receipt — always goes to Supabase Storage under receipts/ prefix.
+export async function uploadReceipt(file: File, userId: string): Promise<string> {
+  const ext  = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
+  const path = `${userId}/receipts/${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from('media').upload(path, file, {
+    contentType: file.type, upsert: false,
+  });
+  if (error) throw new Error(`Receipt upload failed: ${(error as Error).message}`);
+  return supabase.storage.from('media').getPublicUrl(path).data.publicUrl;
+}
+
 export { VPS_BASE_URL };
