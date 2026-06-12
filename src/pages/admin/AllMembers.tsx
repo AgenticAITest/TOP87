@@ -123,12 +123,10 @@ export default function AllMembers() {
 
   const deleteMutation = useMutation({
     mutationFn: async (memberId: string) => {
-      await supabase.from('audit_log').insert({
-        action: 'member_deleted', actor_id: user!.id, target_id: memberId,
-        details: { reason: 'admin_delete' },
+      const { error } = await supabase.functions.invoke('delete-member', {
+        body: { userId: memberId },
       });
-      const { error } = await supabase.from('profiles').delete().eq('id', memberId);
-      if (error) throw error;
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
       setConfirmDeleteId(null);

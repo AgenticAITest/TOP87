@@ -70,16 +70,14 @@ export default function AdminMembers() {
     },
   });
 
-  // Deletes the profile row only (cascades to charter_members, profile_friends).
-  // Does not remove the Supabase auth user — if they sign in again they re-register.
+  // Hard-deletes the auth user via Edge Function (requires service role, super-admin only).
+  // Profile row + cascade (charter_members, profile_friends) deleted server-side.
   const deleteMutation = useMutation({
     mutationFn: async (memberId: string) => {
-      await supabase.from('audit_log').insert({
-        action: 'member_deleted', actor_id: user!.id, target_id: memberId,
-        details: { reason: 'admin_delete' },
+      const { error } = await supabase.functions.invoke('delete-member', {
+        body: { userId: memberId },
       });
-      const { error } = await supabase.from('profiles').delete().eq('id', memberId);
-      if (error) throw error;
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
       setConfirmDeleteId(null);
