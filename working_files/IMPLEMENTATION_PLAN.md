@@ -2,7 +2,7 @@
 
 **Project:** Class of '87 Reunion Portal (SMA Negeri 3 Bandung)
 **Stack:** React 19 + Vite + TypeScript + Supabase + Tailwind CSS
-**Last Updated:** 2026-06-12
+**Last Updated:** 2026-06-12 (session 3)
 
 ---
 
@@ -460,15 +460,15 @@ CREATE TABLE merchandise_orders (
 
 ---
 
-## Phase 4 — Engagement & Countdowns
+## Phase 4 — Engagement & Countdowns ✅ COMPLETE
+**Completed:** 2026-06-12
+
 **Goal:** Gallery comments, live progress countdowns, all dashboard widgets fully live.
 
 ### Dashboard Widgets Activated
-- **Galeri Nostalgia** — shows latest real comment quote
+- **Galeri Nostalgia** — shows latest real comment quote (live from DB)
+- **Progress Reuni** — Dana Terkumpul progress bar + per-item merch stock bars
 - All KPI cards now showing 100% live data — no empty states remain
-
-### CMS Addition
-- Add to cms_content map: `gallery › intro › title`, `gallery › intro › body`
 
 ### Database Changes
 ```sql
@@ -476,26 +476,68 @@ CREATE TABLE media_comments (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   media_id   UUID NOT NULL REFERENCES media(id) ON DELETE CASCADE,
   profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  body       TEXT NOT NULL,
+  body       TEXT NOT NULL CHECK (char_length(body) <= 500),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
 CREATE INDEX media_comments_media_id_idx ON media_comments(media_id);
+
+-- site_settings key:
+INSERT INTO site_settings (key, value) VALUES ('budget_total_target', '247000000');
 ```
 
-### Frontend Tasks
-- [ ] `MediaComments.tsx` — comment list + add comment form (approved members only)
-- [ ] `Gallery.tsx` — embed comments in expanded media view
-- [ ] `AdminMedia.tsx` — comment list per media item with admin Delete
-- [ ] `Landing.tsx` — replace Galeri Nostalgia placeholder with latest real comment
-- [ ] `CountdownWidgets.tsx` — registration progress (vs target), budget collected (vs target), merch stock per item
-- [ ] `Landing.tsx` — add countdown widgets section
-- [ ] `Hero.tsx` — already reads `hero_poster_url` from CMS (prepped in Phase 0); no changes needed
+### What was delivered
+- `MediaComments.tsx` — comment list (avatar, name, timeAgo in Indonesian) + add comment form; Enter to submit; 500 char limit; owner/admin delete; invalidates `qk.latestComment()` on change
+- `Gallery.tsx` — `MediaComments` embedded in lightbox below caption; two-wrapper scroll fix (outer `overflow-y-auto`, centering wrapper `flex min-h-full items-center justify-center`)
+- `Gallery.tsx` — **Prev/Next navigation**: ←/→ arrow buttons, swipe gesture (>50px), keyboard `ArrowLeft`/`ArrowRight`, image counter "N / total", slide+fade `AnimatePresence` with direction-aware x offset; loops at ends
+- `AdminMedia.tsx` — "Komentar" toggle button on approved cards; inline `MediaComments` expands
+- `Landing.tsx` — Galeri Nostalgia shows live latest comment body + profile name from `fetchLatestComment()`
+- `Landing.tsx` — "Progress Reuni" section: Dana Terkumpul animated progress bar (flag-gated), per-item merch stock bars (flag-gated)
+- `useDashboardData.ts` — added `latestComment` and `budgetTarget` to `DashboardData` interface and Promise.all
+- `queries.ts` — added `fetchLatestComment()`, `fetchBudgetTarget()`, `fetchComments()`, `addComment()`, `deleteComment()`, `qk.comments(mediaId)`, `qk.latestComment()`
+- **Attendance label** — "InshaAllah hadir" → "Berencana Hadir" across all 5 files (Landing, Register, MyProfile, AllMembers × 2, panduan-anggota.md)
 
-### Exit Criteria
-- Approved members can comment on gallery posts; admins can delete
+### Deviations from plan
+- `CountdownWidgets.tsx` not created as a separate component — countdown widgets implemented inline in `Landing.tsx` (simpler, no reuse needed elsewhere)
+- CMS addition for `gallery › intro` not implemented — deferred as not needed for Phase 4 functionality
+
+### Exit Criteria ✅
+- Approved members can comment on gallery posts; admins/owners can delete
+- Gallery lightbox supports prev/next navigation (desktop arrows, mobile swipe, keyboard)
 - All dashboard KPI cards show live data — zero empty states remain
-- Landing page shows live registration + budget + merch countdowns
+- Landing page shows live Dana Terkumpul progress and per-item merch stock
+
+---
+
+## Phase 4b — Financial Report & User Manual ✅ COMPLETE
+**Completed:** 2026-06-12
+
+**Goal:** Operational transparency for super admin — unified financial view and role-aware in-app help system.
+
+> These features were added outside the original phased plan in response to growing app complexity.
+
+### What was delivered
+
+#### Admin Financial Report (`/admin/financial`, super admin only)
+- Unified view merging `payments` and `merchandise_orders` into a single sortable `FinancialReportRow[]`
+- Summary cards: Total Iuran, Donasi, Merch Harga Jual, Merch Margin
+- Filters: text search, date from/to, type chips (`reunion_fee`, `donation`, `merchandise`), status chips (dynamic per data), charter dropdown
+- Table: 9 columns including Harga Jual and Margin (merch-only columns); totals footer row
+- `AdminLayout.tsx` — "Lap. Keuangan" link with `BarChart3` icon added to Super Admin nav section
+- `queries.ts` — `fetchFinancialReport()`, `pickCharter()` helper, `FinancialReportRow` type, `qk.financialReport()`
+
+#### Help Modal (`?` floating button, both layouts)
+- `HelpModal.tsx` — role-aware: shows tabs for member / charter admin / super admin based on `useAdminStatus()`; defaults to highest privilege tab available
+- Markdown source files in `src/docs/`: `panduan-anggota.md`, `panduan-charter-admin.md`, `panduan-super-admin.md` — all in Indonesian
+- Left TOC sidebar with anchor links; right scrollable `marked`-rendered prose
+- `src/vite-env.d.ts` — added `*.md?raw` module declaration for Vite raw imports
+- `src/index.css` — added `.help-prose` styles (h1–h4, p, ul, ol, li, code, pre, blockquote, table, a)
+- Floating `?` button: `fixed bottom-6 right-6 z-40` in `MainLayout`; Help button in `AdminLayout` sidebar footer
+- `Escape` key closes
+
+### Exit Criteria ✅
+- Super admin can view all financial transactions in one filtered list
+- All three user roles have an in-app guide accessible without leaving the app
+- Help content is role-gated (members cannot see admin docs)
 
 ---
 
@@ -700,52 +742,21 @@ Cloudflare's network handles the traffic amplification layer. No application cod
 
 ---
 
-## Cross-Cutting Concerns
-
-### RLS Policies (per phase)
-| Phase | Table | Policy |
-|---|---|---|
-| 0 | `cms_content` | Super admin: full CRUD. Charter admin: UPDATE rows where `page_key = 'charter:{their_slug}'` only. Members: SELECT only. |
-| 0 | `site_settings` | Super admin: full CRUD. Others: SELECT only. |
-| 1 | `profile_friends` | Members: INSERT/UPDATE/DELETE own rows only. Others: SELECT approved members' friends. |
-| 2 | `payments` | Members: SELECT/INSERT own rows. Admins: SELECT/UPDATE within charter scope. |
-| 3 | `merchandise` | Public: SELECT active items. Super admin: full CRUD. |
-| 3 | `merchandise_orders` | Same scope rules as `payments`. |
-| 4 | `media_comments` | Approved members: INSERT. Owner or admin: DELETE. All approved: SELECT. |
-
-### Storage Buckets (per phase)
-| Phase | Bucket | Access |
-|---|---|---|
-| 0 | `cms-images` | Public read; admin write (for CMS image uploads) |
-| 2 | `payment-receipts` | Private; member upload own receipts, admin read all |
-| 3 | `merchandise-images` | Public read; admin write (managed via AdminMerchandise) |
-| 6 | R2 `top87-media` | Public read via CDN; authenticated write via Worker presigned URL |
-
-### Audit Log Extensions
-| Phase | Events Logged |
-|---|---|
-| 0 | CMS field updated (page_key, section_key, field_key, updated_by) |
-| 2 | Payment submitted, reconciled, status changed |
-| 3 | Order submitted, reconciled, merchandise stock updated |
-| 4 | Comment deleted by admin |
-| 6 | Media migrated to R2, storage backend switched |
-
----
-
 ## Dashboard Widget Activation Summary
 
-| Widget | Ph 0 | Ph 1 | Ph 2 | Ph 3 | Ph 4 |
-|---|---|---|---|---|---|
-| Kehadiran Alumni (count only) | ✅ | ✅ +breakdown | ✅ | ✅ | ✅ |
-| Total Dana Terkumpul | ⬜ empty | ⬜ empty | ✅ live | ✅ | ✅ |
-| Merchandise Terpesan | ⬜ empty | ⬜ empty | ⬜ empty | ✅ live | ✅ |
-| Pendaftaran payment badges | ⬜ hidden | ⬜ hidden | ✅ live | ✅ | ✅ |
-| Bantu Teman Angkatan | ⬜ hidden | ⬜ hidden | ✅ revealed | ✅ | ✅ |
-| Galeri Nostalgia comment | ⬜ thumbs only | ⬜ thumbs only | ⬜ thumbs only | ⬜ thumbs only | ✅ live |
-| Countdown timer | ✅ CMS | ✅ | ✅ | ✅ | ✅ |
-| Budget table | ✅ CMS | ✅ | ✅ | ✅ | ✅ |
-| Donasi sidebar link | ⬜ hidden | ⬜ hidden | ✅ flag | ✅ | ✅ |
-| Merchandise sidebar link | ⬜ hidden | ⬜ hidden | ⬜ hidden | ✅ flag | ✅ |
+| Widget | Ph 0 | Ph 1 | Ph 2 | Ph 3 | Ph 4 | Now |
+|---|---|---|---|---|---|---|
+| Kehadiran Alumni (count only) | ✅ | ✅ +breakdown | ✅ | ✅ | ✅ | ✅ |
+| Total Dana Terkumpul | ⬜ empty | ⬜ empty | ✅ live | ✅ | ✅ | ✅ |
+| Progress Reuni (Dana + Merch) | ⬜ | ⬜ | ⬜ | ⬜ | ✅ live | ✅ |
+| Merchandise Terpesan | ⬜ empty | ⬜ empty | ⬜ empty | ✅ live | ✅ | ✅ |
+| Pendaftaran payment badges | ⬜ hidden | ⬜ hidden | ✅ live | ✅ | ✅ | ✅ |
+| Bantu Teman Angkatan | ⬜ hidden | ⬜ hidden | ✅ revealed | ✅ | ✅ | ✅ |
+| Galeri Nostalgia comment | ⬜ thumbs only | ⬜ thumbs only | ⬜ thumbs only | ⬜ thumbs only | ✅ live | ✅ |
+| Countdown timer | ✅ CMS | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Budget table | ✅ CMS | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Donasi sidebar link | ⬜ hidden | ⬜ hidden | ✅ flag | ✅ | ✅ | ✅ |
+| Merchandise sidebar link | ⬜ hidden | ⬜ hidden | ⬜ hidden | ✅ flag | ✅ | ✅ |
 
 ---
 
@@ -957,13 +968,14 @@ CREATE POLICY "charter_members_superadmin_all"
 
 ## Phase Summary Table
 
-| Phase | Features | New Tables | Effort | Depends On |
-|---|---|---|---|---|
-| **0** | Design system, CMS foundation + admin UI, shell redesign, empty states, Anggaran + FAQ pages, phase-gated nav | `cms_content` | Medium–High | Committee approval ✅ |
-| **1** | Extended profile, friends list, theme toggle | `profile_friends` + profile columns | Low | Phase 0 |
-| **2** | QRIS payments, receipts, admin reconciliation | `payments` | Medium | Phase 1 |
-| **3** | Merchandise catalog, orders, stock tracking | `merchandise`, `merchandise_orders` | Medium | Phase 2 |
-| **4** | Gallery comments, countdown widgets | `media_comments` | Low–Medium | Phase 2 + 3 |
-| **5** | WhatsApp daily status bot | — (site_settings keys) | High (separate service) | Phase 4 |
-| **6** | Cloudflare R2 storage, CDN, image resizing, Cloudflare Pages deploy, spike-traffic hardening | — (site_settings keys) | Medium (infra-heavy) | Phase 5 |
-| **7** | Light/dark theme toggle, Finance Admin role (bank rekon only), Charter management UI, Admin panel backdrop image | `finance_admins` | Medium | Phase 3 |
+| Phase | Status | Features | New Tables | Effort | Depends On |
+|---|---|---|---|---|---|
+| **0** | ✅ Complete | Design system, CMS foundation + admin UI, shell redesign, empty states, Anggaran + FAQ pages, phase-gated nav | `cms_content` | Medium–High | Committee approval ✅ |
+| **1** | ✅ Complete | Extended profile, friends list, attendance tracking | `profile_friends` + profile columns | Low | Phase 0 |
+| **2** | ✅ Complete | QRIS payments, receipts, admin reconciliation | `payments` | Medium | Phase 1 |
+| **3** | ✅ Complete | Merchandise catalog, orders, stock tracking, cost/margin | `merchandise`, `merchandise_orders` | Medium | Phase 2 |
+| **4** | ✅ Complete | Gallery comments + lightbox navigation, countdown widgets, attendance label fix | `media_comments` | Low–Medium | Phase 2 + 3 |
+| **4b** | ✅ Complete | Admin Financial Report (unified view, multi-filter), Help Modal (role-aware in-app user manual) | — | Low–Medium | Phase 3 |
+| **5** | ⬜ Pending | WhatsApp daily status bot | — (site_settings keys) | High (separate service) | Phase 4 |
+| **6** | ⬜ Pending | Cloudflare R2 storage, CDN, image resizing, Cloudflare Pages deploy, spike-traffic hardening | — (site_settings keys) | Medium (infra-heavy) | Phase 5 |
+| **7** | ⬜ Pending | Light/dark theme toggle, Finance Admin role (bank rekon only), Charter management UI, Admin panel backdrop image | `finance_admins` | Medium | Phase 3 |
