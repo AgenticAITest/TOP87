@@ -59,7 +59,7 @@ export default function App() {
 
         {/* Public + member routes */}
         <Route element={<MainLayout />}>
-          <Route path="/home"        element={<Landing />} />
+          <Route path="/home"        element={<ProtectedRoute><Landing /></ProtectedRoute>} />
           <Route path="/about"       element={<About />} />
           <Route path="/charters"    element={<ChaptersPage />} />
           <Route path="/charters/:slug" element={<CharterDetail />} />

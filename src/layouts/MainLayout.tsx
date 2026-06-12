@@ -1,5 +1,5 @@
 import { useState, Fragment, type ElementType } from 'react';
-import { Outlet, NavLink, Link } from 'react-router-dom';
+import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Receipt, ShoppingBag, Heart, Megaphone, HelpCircle,
   Users, Image as ImageIcon, MapPin, BookOpen, Bell, LogOut, Menu, X,
@@ -53,6 +53,7 @@ function SidebarInner({ onClose }: { onClose?: () => void }) {
   const { user, profile, signOut, signInWithGoogle } = useAuth();
   const { isAdmin } = useAdminStatus();
   const { data: flags } = useFeatureFlags();
+  const navigate = useNavigate();
 
   const avatarUrl   = profile?.avatar_url ?? user?.user_metadata?.avatar_url;
   const displayName = profile?.name ?? user?.user_metadata?.full_name ?? 'Tamu';
@@ -164,7 +165,7 @@ function SidebarInner({ onClose }: { onClose?: () => void }) {
                 Profil
               </Link>
               <button
-                onClick={() => { signOut(); onClose?.(); }}
+                onClick={() => { signOut(); onClose?.(); navigate('/'); }}
                 className="hover:text-red-400 transition-colors flex items-center gap-1"
               >
                 <LogOut className="w-3 h-3" />
