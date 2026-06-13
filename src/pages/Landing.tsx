@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Download, ArrowRight, Info } from 'lucide-react';
+import { Users, Download, ArrowRight, Info, FileText } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { usePageContent } from '../hooks/usePageContent';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { resolveMediaUrl } from '../lib/storage';
+import { qk, fetchSiteSetting } from '../lib/queries';
 
 // ── Defaults (shown when CMS row not yet created) ─────────────────────────────
 
@@ -67,6 +69,11 @@ export default function Landing() {
   const { data: anggaranCms } = usePageContent('anggaran');
   const { data: dashboard }   = useDashboardData();
   const { data: flags }       = useFeatureFlags();
+  const { data: flyerUrl = '' } = useQuery({
+    queryKey: qk.siteSetting('anggaran_flyer_url'),
+    queryFn:  () => fetchSiteSetting('anggaran_flyer_url'),
+    staleTime: 5 * 60_000,
+  });
 
   // CMS values with fallbacks
   const heroTitle    = landingCms?.['hero.title']              ?? DEFAULT_HERO_TITLE;
@@ -592,6 +599,18 @@ export default function Landing() {
             <Info className="w-4 h-4 text-gold shrink-0 mt-0.5" />
             <p className="text-[10px] text-gray-500 italic">{budgetNote}</p>
           </div>
+          {flyerUrl && (
+            <a
+              href={flyerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 flex items-center gap-2 text-xs font-semibold text-amber-700 hover:text-amber-900 transition-colors border-t border-amber-100 pt-4"
+            >
+              <FileText className="w-4 h-4 shrink-0" />
+              Lihat Flyer Anggaran Lengkap
+              <ArrowRight className="w-3 h-3 ml-auto" />
+            </a>
+          )}
         </div>
 
         {/* Right column */}

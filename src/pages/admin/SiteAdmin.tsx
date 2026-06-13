@@ -1,6 +1,6 @@
 import { useState, useMemo, ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { Check, Loader, HardDrive, Cloud, Shuffle, List, Search, X, Users, ToggleLeft, ToggleRight, QrCode } from 'lucide-react';
+import { Check, Loader, HardDrive, Cloud, Shuffle, List, Search, X, Users, ToggleLeft, ToggleRight, QrCode, FileText } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { getStorageBackend, setStorageBackend, type StorageBackend } from '../../lib/storage';
@@ -8,6 +8,7 @@ import {
   getFeaturedConfig, setFeaturedConfig,
   fetchApprovedMembers,
   fetchQRISConfig, setQRISConfig,
+  fetchSiteSetting, setSiteSetting,
   type FeaturedMode, type FeaturedConfig, type QRISConfig,
   qk,
 } from '../../lib/queries';
@@ -184,6 +185,26 @@ export default function SiteAdmin() {
     mode     !== (featuredConfig?.mode ?? 'random') ||
     interval !== (featuredConfig?.interval ?? 15)   ||
     JSON.stringify(ids) !== JSON.stringify(featuredConfig?.memberIds ?? []);
+
+  // ── Anggaran flyer URL ──
+  const [flyerSaved, setFlyerSaved]       = useState(false);
+  const [localFlyerUrl, setLocalFlyerUrl] = useState<string | null>(null);
+  const { data: currentFlyerUrl = '' }    = useQuery({
+    queryKey: qk.siteSetting('anggaran_flyer_url'),
+    queryFn:  () => fetchSiteSetting('anggaran_flyer_url'),
+  });
+  const activeFlyerUrl = localFlyerUrl ?? currentFlyerUrl;
+  const flyerDirty     = localFlyerUrl !== null && localFlyerUrl !== currentFlyerUrl;
+
+  const flyerMutation = useMutation({
+    mutationFn: () => setSiteSetting('anggaran_flyer_url', activeFlyerUrl),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.siteSetting('anggaran_flyer_url') });
+      setLocalFlyerUrl(null);
+      setFlyerSaved(true);
+      setTimeout(() => setFlyerSaved(false), 2000);
+    },
+  });
 
   // Member search helpers
   const searchResults = useMemo(() => {
@@ -558,6 +579,55 @@ export default function SiteAdmin() {
                     : 'Save'}
               </button>
             </div>
+          )}
+        </section>
+
+        {/* ── Anggaran Flyer ── */}
+        <section className="glass rounded-2xl p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <FileText size={16} className="text-gold/60" />
+            <h2 className="text-white font-bold text-lg">Flyer Anggaran</h2>
+          </div>
+          <p className="text-gray-500 text-sm mb-6">
+            URL file PDF flyer anggaran. Jika diisi, link "Lihat Flyer Anggaran Lengkap" akan muncul di bagian bawah kartu Rincian Anggaran pada dashboard anggota.
+          </p>
+          <div className="space-y-3">
+            <input
+              type="url"
+              value={activeFlyerUrl}
+              onChange={e => setLocalFlyerUrl(e.target.value)}
+              placeholder="https://… (URL PDF dari Supabase Storage atau hosting lain)"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+            />
+            {activeFlyerUrl && (
+              <p className="text-xs text-gray-500 truncate">
+                Preview: <a href={activeFlyerUrl} target="_blank" rel="noopener noreferrer" className="text-gold hover:underline">{activeFlyerUrl}</a>
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-3 mt-4">
+            <button
+              onClick={() => flyerMutation.mutate()}
+              disabled={flyerMutation.isPending || !flyerDirty}
+              className="flex items-center gap-2 bg-gold hover:bg-gold/90 text-charcoal font-bold py-2.5 px-6 rounded-full transition-all disabled:opacity-40 uppercase tracking-widest text-xs"
+            >
+              {flyerMutation.isPending
+                ? <><Loader size={14} className="animate-spin" /> Saving…</>
+                : flyerSaved
+                  ? <><Check size={14} /> Saved</>
+                  : 'Save'}
+            </button>
+            {activeFlyerUrl && (
+              <button
+                onClick={() => setLocalFlyerUrl('')}
+                className="text-xs text-gray-500 hover:text-red-400 transition-colors"
+              >
+                Hapus URL
+              </button>
+            )}
+          </div>
+          {flyerMutation.isError && (
+            <p className="text-red-400 text-xs mt-3">{(flyerMutation.error as Error).message}</p>
           )}
         </section>
 

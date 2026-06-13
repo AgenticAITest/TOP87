@@ -33,6 +33,8 @@ export const qk = {
   // Phase 4 — comments
   comments:         (mediaId: string)                       => ['comments', mediaId]                          as const,
   latestComment:    ()                                      => ['comments', 'latest']                         as const,
+  // Generic site setting
+  siteSetting:      (key: string)                           => ['site_settings', key]                         as const,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -858,4 +860,22 @@ export async function fetchFinancialReport(): Promise<FinancialReportRow[]> {
   return [...paymentRows, ...orderRows].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
+}
+
+// ─── Generic site setting ─────────────────────────────────────────────────────
+
+export async function fetchSiteSetting(key: string): Promise<string> {
+  const { data } = await supabase
+    .from('site_settings')
+    .select('value')
+    .eq('key', key)
+    .maybeSingle();
+  return (data as any)?.value ?? '';
+}
+
+export async function setSiteSetting(key: string, value: string): Promise<void> {
+  const { error } = await supabase
+    .from('site_settings')
+    .upsert({ key, value }, { onConflict: 'key' });
+  if (error) throw error;
 }
