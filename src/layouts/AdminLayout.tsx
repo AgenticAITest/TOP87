@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAdminBackdrop, qk } from '../lib/queries';
 import { Outlet, NavLink, Link, Navigate } from 'react-router-dom';
-import { Users, Image, LayoutDashboard, FileText, Globe, ChevronRight, LogOut, BookOpen, ShieldCheck, PenSquare, CreditCard, ShoppingBag, Package, BarChart3, CircleHelp, Sun, Moon, Landmark, Building2 } from 'lucide-react';
+import { Users, Image, LayoutDashboard, FileText, Globe, ChevronRight, LogOut, BookOpen, ShieldCheck, PenSquare, CreditCard, ShoppingBag, Package, BarChart3, CircleHelp, Sun, Moon, Landmark, Building2, HeartHandshake } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminStatus } from '../hooks/useAdminStatus';
 import { useTheme } from '../contexts/ThemeContext';
@@ -25,8 +25,9 @@ const superAdminLinks = [
   { to: '/admin/all-members', label: 'All Members',    icon: Users,       end: false },
   { to: '/admin/roles',       label: 'Admin Roles',    icon: ShieldCheck, end: false },
   { to: '/admin/charters',    label: 'Charters',       icon: Building2,   end: false },
-  { to: '/admin/bank-rekon',  label: 'Bank Rekon',     icon: Landmark,    end: false },
-  { to: '/admin/financial',   label: 'Lap. Keuangan',  icon: BarChart3,   end: false },
+  { to: '/admin/bank-rekon',  label: 'Bank Rekon',    icon: Landmark,        end: false },
+  { to: '/admin/financial',   label: 'Lap. Keuangan', icon: BarChart3,       end: false },
+  { to: '/admin/keringanan',  label: 'Keringanan',    icon: HeartHandshake,  end: false },
 ];
 
 const financeOnlyLinks = [

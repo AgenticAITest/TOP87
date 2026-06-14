@@ -119,7 +119,7 @@ const PAGE_KEYS = Object.keys(PAGES);
 // ─── Anggaran config type & defaults ──────────────────────────────────────────
 
 interface AnggaranItem { keterangan: string; amount: number; }
-interface AnggaranConfig { mode: 'per_person' | 'per_category'; quota: number; items: AnggaranItem[]; }
+interface AnggaranConfig { mode: 'per_person' | 'per_category'; quota: number; items: AnggaranItem[]; fee_per_orang?: number; }
 
 const DEFAULT_ANGGARAN_CONFIG: AnggaranConfig = {
   mode: 'per_person',
@@ -151,8 +151,9 @@ function AnggaranEditor({ initialJson, onSaved }: { initialJson: string; onSaved
     try { return JSON.parse(initialJson) as AnggaranConfig; } catch { return DEFAULT_ANGGARAN_CONFIG; }
   }, [initialJson]);
 
-  const [mode,  setMode]  = useState<'per_person' | 'per_category'>(initial.mode  ?? 'per_person');
-  const [quota, setQuota] = useState<number>(initial.quota ?? 122);
+  const [mode,        setMode]        = useState<'per_person' | 'per_category'>(initial.mode ?? 'per_person');
+  const [quota,       setQuota]       = useState<number>(initial.quota ?? 122);
+  const [feePerOrang, setFeePerOrang] = useState<number>(initial.fee_per_orang ?? 0);
   const [items, setItems] = useState<AnggaranItem[]>(
     initial.items?.length ? initial.items : DEFAULT_ANGGARAN_CONFIG.items
   );
@@ -162,6 +163,7 @@ function AnggaranEditor({ initialJson, onSaved }: { initialJson: string; onSaved
   useEffect(() => {
     setMode(initial.mode ?? 'per_person');
     setQuota(initial.quota ?? 122);
+    setFeePerOrang(initial.fee_per_orang ?? 0);
     setItems(initial.items?.length ? initial.items : DEFAULT_ANGGARAN_CONFIG.items);
   }, [initial]);
 
@@ -170,14 +172,15 @@ function AnggaranEditor({ initialJson, onSaved }: { initialJson: string; onSaved
     catch { return JSON.stringify(DEFAULT_ANGGARAN_CONFIG); }
   }, [initialJson]);
 
-  const isDirty = JSON.stringify({ mode, quota, items }) !== initialNorm;
+  const isDirty = JSON.stringify({ mode, quota, items, fee_per_orang: feePerOrang || undefined }) !== initialNorm;
 
   const sumAmount      = items.reduce((s, i) => s + (i.amount || 0), 0);
   const grandTotal     = mode === 'per_person' ? sumAmount * quota : sumAmount;
   const grandPerOrang  = mode === 'per_person' ? sumAmount : (quota > 0 ? Math.round(sumAmount / quota) : 0);
 
   const { mutate, isPending, isError, error } = useMutation({
-    mutationFn: () => upsertField('anggaran', 'items', 'config', JSON.stringify({ mode, quota, items }), 'json'),
+    mutationFn: () => upsertField('anggaran', 'items', 'config',
+      JSON.stringify({ mode, quota, items, ...(feePerOrang ? { fee_per_orang: feePerOrang } : {}) }), 'json'),
     onSuccess: () => { setSaved(true); onSaved(); setTimeout(() => setSaved(false), 2000); },
   });
 
@@ -264,6 +267,21 @@ function AnggaranEditor({ initialJson, onSaved }: { initialJson: string; onSaved
         </button>
       </div>
 
+      {/* Target iuran per orang */}
+      <div>
+        <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1.5">
+          Target Iuran Kebersamaan Per Orang (opsional)
+        </label>
+        <input type="number" value={feePerOrang || ''} min={0}
+          onChange={e => setFeePerOrang(parseInt(e.target.value, 10) || 0)}
+          placeholder="misal: 1870000"
+          className="w-48 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors" />
+        <p className="text-[11px] text-gray-600 mt-1">
+          Ditampilkan sebagai baris khusus di bawah total anggaran — angka iuran yang dikomunikasikan ke member.
+          Kosongkan jika tidak ingin ditampilkan.
+        </p>
+      </div>
+
       {/* Auto-totals */}
       <div className="rounded-xl bg-white/[0.02] border border-white/5 p-4 space-y-2">
         <p className="text-[10px] uppercase tracking-widest text-gray-600 mb-2">Kalkulasi Otomatis</p>
@@ -340,6 +358,16 @@ function AnggaranEditor({ initialJson, onSaved }: { initialJson: string; onSaved
                     <td className="py-3 text-right">Rp {grandTotal.toLocaleString('id-ID')}</td>
                     <td className="py-3 text-right">Rp {grandPerOrang.toLocaleString('id-ID')}</td>
                   </tr>
+                  {feePerOrang > 0 && (
+                    <tr className="border-t-2 border-amber-500/40 text-amber-400">
+                      <td colSpan={3} className="py-3 pr-4 text-right text-sm font-semibold">
+                        Target Iuran Kebersamaan Per Orang
+                      </td>
+                      <td className="py-3 text-right font-bold whitespace-nowrap">
+                        Rp {feePerOrang.toLocaleString('id-ID')}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

@@ -43,6 +43,9 @@ export const qk = {
   charterMembers:   (charterId: string)                     => ['admin', 'charters', charterId, 'members']   as const,
   // Phase 7.4 — admin backdrop
   adminBackdrop:    ()                                      => ['admin', 'backdrop']                          as const,
+  // Keringanan (financial assistance)
+  myKeringanan:     (profileId: string)                     => ['keringanan', 'my', profileId]                as const,
+  allKeringanan:    ()                                      => ['keringanan', 'all']                          as const,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1042,6 +1045,73 @@ export async function fetchFinancialReport(): Promise<FinancialReportRow[]> {
   return [...paymentRows, ...orderRows].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
+}
+
+// ─── Keringanan (financial assistance requests) ───────────────────────────────
+
+export interface KeringananRequest {
+  id:             string;
+  profile_id:     string;
+  name:           string;
+  contact_number: string;
+  email:          string;
+  jumlah_sanggup: number;
+  alasan:         string;
+  status:         'pending' | 'approved' | 'rejected';
+  admin_notes:    string | null;
+  created_at:     string;
+  updated_at:     string;
+}
+
+export async function fetchMyKeringanan(profileId: string): Promise<KeringananRequest | null> {
+  const { data } = await supabase
+    .from('keringanan_requests')
+    .select('*')
+    .eq('profile_id', profileId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data as KeringananRequest | null;
+}
+
+export async function submitKeringanan(req: {
+  profileId:     string;
+  name:          string;
+  contactNumber: string;
+  email:         string;
+  jumlahSanggup: number;
+  alasan:        string;
+}): Promise<void> {
+  const { error } = await supabase.from('keringanan_requests').insert({
+    profile_id:     req.profileId,
+    name:           req.name,
+    contact_number: req.contactNumber,
+    email:          req.email,
+    jumlah_sanggup: req.jumlahSanggup,
+    alasan:         req.alasan,
+  });
+  if (error) throw error;
+}
+
+export async function fetchAllKeringanan(): Promise<KeringananRequest[]> {
+  const { data, error } = await supabase
+    .from('keringanan_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+  must(data, error);
+  return (data ?? []) as KeringananRequest[];
+}
+
+export async function updateKeringananStatus(
+  id: string,
+  status: 'approved' | 'rejected',
+  adminNotes?: string | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from('keringanan_requests')
+    .update({ status, admin_notes: adminNotes ?? null, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw error;
 }
 
 // ─── Generic site setting ─────────────────────────────────────────────────────

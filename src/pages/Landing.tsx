@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Download, ArrowRight, Info, FileText } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { Users, Download, ArrowRight, Info, FileText, X } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { usePageContent } from '../hooks/usePageContent';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { resolveMediaUrl } from '../lib/storage';
-import { qk, fetchSiteSetting } from '../lib/queries';
+import { qk, fetchSiteSetting, fetchMyKeringanan, submitKeringanan } from '../lib/queries';
 
 // ── Defaults (shown when CMS row not yet created) ─────────────────────────────
 
@@ -23,6 +23,7 @@ interface AnggaranConfig {
   mode: 'per_person' | 'per_category';
   quota: number;
   items: { keterangan: string; amount: number }[];
+  fee_per_orang?: number;
 }
 
 const DEFAULT_ANGGARAN_CONFIG: AnggaranConfig = {
@@ -67,7 +68,7 @@ function useCountdown(iso: string) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Landing() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const { data: landingCms }  = usePageContent('landing');
   const { data: anggaranCms } = usePageContent('anggaran');
   const { data: dashboard }   = useDashboardData();
@@ -104,10 +105,45 @@ export default function Landing() {
   const grandPerOrang         = anggaranMode === 'per_person' ? sumAmount
                                 : (quotaTarget > 0 ? Math.round(sumAmount / quotaTarget) : 0);
 
-  const countdown         = useCountdown(reunionIso);
-  const approvedCount     = dashboard?.approvedCount ?? 0;
-  const attendancePct     = quotaTarget > 0 ? Math.min(Math.round((approvedCount / quotaTarget) * 100), 100) : 0;
-  const isApproved        = profile?.status === 'approved';
+  const countdown     = useCountdown(reunionIso);
+  const approvedCount = dashboard?.approvedCount ?? 0;
+  const attendancePct = quotaTarget > 0 ? Math.min(Math.round((approvedCount / quotaTarget) * 100), 100) : 0;
+  const isApproved    = profile?.status === 'approved';
+
+  // Keringanan (financial assistance) modal
+  const queryClient = useQueryClient();
+  const [showKeringanan, setShowKeringanan] = useState(false);
+  const [keringananForm, setKeringananForm] = useState({ contact_number: '', jumlah_sanggup: '', alasan: '' });
+  const [keringananSuccess, setKeringananSuccess] = useState(false);
+
+  const { data: myKeringanan } = useQuery({
+    queryKey: qk.myKeringanan(profile?.id ?? ''),
+    queryFn:  () => fetchMyKeringanan(profile!.id),
+    enabled:  !!profile,
+    staleTime: 0,
+  });
+
+  const keringananMutation = useMutation({
+    mutationFn: () => submitKeringanan({
+      profileId:     profile!.id,
+      name:          profile!.name ?? '',
+      contactNumber: keringananForm.contact_number,
+      email:         user?.email ?? '',
+      jumlahSanggup: parseInt(keringananForm.jumlah_sanggup, 10) || 0,
+      alasan:        keringananForm.alasan,
+    }),
+    onSuccess: () => {
+      setKeringananSuccess(true);
+      queryClient.invalidateQueries({ queryKey: qk.myKeringanan(profile!.id) });
+    },
+  });
+
+  // Pre-fill phone when profile loads
+  useEffect(() => {
+    if ((profile as any)?.phone) {
+      setKeringananForm(f => ({ ...f, contact_number: (profile as any).phone }));
+    }
+  }, [profile?.id]);
 
   const heroStyle = {
     backgroundImage: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('${
@@ -118,6 +154,7 @@ export default function Landing() {
   };
 
   return (
+    <>
     <div className="p-6 md:p-8">
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
@@ -607,6 +644,16 @@ export default function Landing() {
                   <td className="py-4 text-right whitespace-nowrap">Rp {budgetTargetFromTable.toLocaleString('id-ID')}</td>
                   <td className="py-4 text-right whitespace-nowrap">Rp {grandPerOrang.toLocaleString('id-ID')}</td>
                 </tr>
+                {anggaranConfig.fee_per_orang ? (
+                  <tr className="border-t-2 border-amber-300 dark:border-amber-600/50 text-amber-700 dark:text-amber-400">
+                    <td colSpan={3} className="py-3 pr-4 text-right text-sm font-semibold">
+                      Target Iuran Kebersamaan Per Orang
+                    </td>
+                    <td className="py-3 text-right whitespace-nowrap font-bold">
+                      Rp {anggaranConfig.fee_per_orang.toLocaleString('id-ID')}
+                    </td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
@@ -614,18 +661,36 @@ export default function Landing() {
             <Info className="w-4 h-4 text-gold shrink-0 mt-0.5" />
             <p className="text-[10px] text-gray-500 dark:text-gray-400 italic">{budgetNote}</p>
           </div>
-          {flyerUrl && (
-            <a
-              href={flyerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-4 flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-300 transition-colors border-t border-amber-100 dark:border-amber-800/20 pt-4"
-            >
-              <FileText className="w-4 h-4 shrink-0" />
-              Lihat Flyer Anggaran Lengkap
-              <ArrowRight className="w-3 h-3 ml-auto" />
-            </a>
-          )}
+          <div className="mt-4 pt-4 border-t border-amber-100 dark:border-amber-800/20 flex items-center gap-3 flex-wrap">
+            {flyerUrl && (
+              <a
+                href={flyerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-amber-200 dark:border-amber-700/40 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+              >
+                <FileText className="w-3.5 h-3.5 shrink-0" />
+                Lihat Lengkapnya
+              </a>
+            )}
+            {profile && (() => {
+              const hasActive = myKeringanan?.status === 'pending' || myKeringanan?.status === 'approved';
+              return (
+                <button
+                  onClick={() => { setKeringananSuccess(false); setShowKeringanan(true); }}
+                  className={`ml-auto flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                    hasActive
+                      ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-700/40 cursor-default'
+                      : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-700/40 hover:bg-amber-100 dark:hover:bg-amber-900/30'
+                  }`}
+                >
+                  {myKeringanan?.status === 'pending'  && 'Sedang Ditinjau'}
+                  {myKeringanan?.status === 'approved' && 'Keringanan Disetujui ✓'}
+                  {(!myKeringanan || myKeringanan.status === 'rejected') && 'Minta Keringanan'}
+                </button>
+              );
+            })()}
+          </div>
         </div>
 
         {/* Right column */}
@@ -678,5 +743,101 @@ export default function Landing() {
         </div>
       </div>
     </div>
+
+    {/* ── Keringanan Modal ──────────────────────────────────────────────── */}
+    {showKeringanan && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        onClick={() => setShowKeringanan(false)}
+      >
+        <div
+          className="bg-white dark:bg-zinc-900 border border-amber-200 dark:border-white/10 rounded-2xl p-6 max-w-lg w-full shadow-2xl"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="flex justify-between items-start mb-5">
+            <div>
+              <h3 className="font-serif text-lg font-bold text-gray-900 dark:text-white">Minta Keringanan</h3>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                Ceritakan situasimu — panitia akan meninjaunya secara personal.
+              </p>
+            </div>
+            <button onClick={() => setShowKeringanan(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-white ml-4 shrink-0">
+              <X size={18} />
+            </button>
+          </div>
+
+          {keringananSuccess ? (
+            <div className="text-center py-8">
+              <div className="text-4xl mb-3">🤝</div>
+              <p className="font-bold text-gray-900 dark:text-white mb-1">Terima kasih sudah berbagi.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Panitia akan menghubungimu melalui kontak yang kamu berikan.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Nama</label>
+                  <input value={profile?.name ?? ''} readOnly
+                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-gray-500 dark:text-gray-400 cursor-not-allowed" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Email</label>
+                  <input value={user?.email ?? ''} readOnly
+                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-gray-500 dark:text-gray-400 cursor-not-allowed" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Nomor Kontak (WhatsApp)</label>
+                <input
+                  value={keringananForm.contact_number}
+                  onChange={e => setKeringananForm(f => ({ ...f, contact_number: e.target.value }))}
+                  placeholder="08xxxxxxxxxx"
+                  className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-amber-400 dark:focus:border-gold/50 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  Jumlah yang bisa ditanggung sendiri (Rp)
+                </label>
+                <input
+                  type="number"
+                  value={keringananForm.jumlah_sanggup}
+                  onChange={e => setKeringananForm(f => ({ ...f, jumlah_sanggup: e.target.value }))}
+                  placeholder="0"
+                  min={0}
+                  className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-amber-400 dark:focus:border-gold/50 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cerita singkat / alasan</label>
+                <textarea
+                  value={keringananForm.alasan}
+                  onChange={e => setKeringananForm(f => ({ ...f, alasan: e.target.value }))}
+                  placeholder="Ceritakan situasimu dengan singkat…"
+                  rows={4}
+                  className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-amber-400 dark:focus:border-gold/50 transition-colors resize-none"
+                />
+              </div>
+              {keringananMutation.isError && (
+                <p className="text-red-500 text-xs">{(keringananMutation.error as Error).message}</p>
+              )}
+              <button
+                onClick={() => keringananMutation.mutate()}
+                disabled={keringananMutation.isPending || !keringananForm.contact_number.trim() || !keringananForm.alasan.trim()}
+                className="w-full btn-primary py-2.5 rounded-lg font-bold text-sm disabled:opacity-50 transition-opacity"
+              >
+                {keringananMutation.isPending ? 'Mengirim…' : 'Kirim Permintaan'}
+              </button>
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 text-center">
+                Data ini hanya terlihat oleh panitia. Tidak akan dipublikasikan.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+    </>
   );
 }

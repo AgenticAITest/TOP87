@@ -40,6 +40,7 @@ import AdminOrders           from './pages/admin/AdminOrders';
 import AdminFinancialReport  from './pages/admin/AdminFinancialReport';
 import AdminBankRekon        from './pages/admin/AdminBankRekon';
 import AdminCharters         from './pages/admin/AdminCharters';
+import AdminKeringanan       from './pages/admin/AdminKeringanan';
 import PaymentsPage     from './pages/PaymentsPage';
 import MerchandisePage  from './pages/MerchandisePage';
 import MyOrdersPage     from './pages/MyOrdersPage';
@@ -110,6 +111,7 @@ export default function App() {
           <Route path="financial"       element={<AdminFinancialReport />} />
           <Route path="bank-rekon"      element={<AdminBankRekon />} />
           <Route path="charters"        element={<AdminCharters />} />
+          <Route path="keringanan"      element={<AdminKeringanan />} />
           <Route path="*"           element={<Navigate to="/admin" replace />} />
         </Route>
 
