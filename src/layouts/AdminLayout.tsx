@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAdminBackdrop, qk } from '../lib/queries';
 import { Outlet, NavLink, Link, Navigate } from 'react-router-dom';
-import { Users, Image, LayoutDashboard, FileText, Globe, ChevronRight, LogOut, BookOpen, ShieldCheck, PenSquare, CreditCard, ShoppingBag, Package, BarChart3, CircleHelp, Sun, Moon, Landmark, Building2, HeartHandshake } from 'lucide-react';
+import { Users, Image, LayoutDashboard, FileText, Globe, ChevronRight, ChevronLeft, LogOut, BookOpen, ShieldCheck, PenSquare, CreditCard, ShoppingBag, Package, BarChart3, CircleHelp, Sun, Moon, Landmark, Building2, HeartHandshake } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminStatus } from '../hooks/useAdminStatus';
 import { useTheme } from '../contexts/ThemeContext';
@@ -39,7 +39,16 @@ export default function AdminLayout() {
   const { user, profile, signOut } = useAuth();
   const { isAdmin, isSuperAdmin, isFinanceAdmin, loading } = useAdminStatus();
   const { theme, toggleTheme } = useTheme();
-  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpOpen,   setHelpOpen]   = useState(false);
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('admin-sidebar-collapsed') === 'true');
+
+  function toggle() {
+    setCollapsed(v => {
+      const next = !v;
+      localStorage.setItem('admin-sidebar-collapsed', String(next));
+      return next;
+    });
+  }
 
   const { data: backdrop } = useQuery({
     queryKey: qk.adminBackdrop(),
@@ -62,121 +71,157 @@ export default function AdminLayout() {
   }
 
   const financeOnly = isFinanceAdmin && !isAdmin;
-
   const avatarUrl   = profile?.avatar_url ?? user.user_metadata?.avatar_url;
   const displayName = profile?.name ?? user.user_metadata?.full_name ?? 'Admin';
+
+  const sidebarW = collapsed ? 'w-14' : 'w-60';
+  const contentL = collapsed ? 'ml-14' : 'ml-60';
+  const backdropL = collapsed ? 'left-14' : 'left-60';
+
+  function navLinkClass(isActive: boolean) {
+    return `flex items-center ${collapsed ? 'justify-center px-1' : 'gap-3 px-3'} py-2.5 rounded-lg text-sm transition-all group ${
+      isActive ? 'bg-gold/10 text-gold border border-gold/20' : 'text-gray-400 hover:text-white hover:bg-white/5'
+    }`;
+  }
+
+  function renderLinks(links: typeof adminLinks) {
+    return links.map(({ to, label, icon: Icon, end }) => (
+      <NavLink key={to} to={to} end={end} title={collapsed ? label : undefined}
+        className={({ isActive }) => navLinkClass(isActive)}>
+        <Icon size={16} className="shrink-0" />
+        {!collapsed && (
+          <>
+            <span className="flex-1">{label}</span>
+            <ChevronRight size={12} className="opacity-0 group-hover:opacity-40 transition-opacity" />
+          </>
+        )}
+      </NavLink>
+    ));
+  }
 
   return (
     <div className="flex min-h-screen bg-charcoal selection:bg-gold selection:text-charcoal overflow-x-hidden">
       {/* Sidebar */}
-      <aside className="fixed top-0 left-0 h-full w-60 bg-navy/60 border-r border-white/5 flex flex-col z-40">
+      <aside className={`fixed top-0 left-0 h-full ${sidebarW} bg-navy/60 border-r border-white/5 flex flex-col z-40 transition-[width] duration-200 overflow-hidden`}>
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-3 px-5 py-5 border-b border-white/5 group">
-          <img src="/logo.png" alt="TOP87" className="w-9 h-9 object-contain" />
-          <div>
-            <p className="text-xs font-bold text-white uppercase tracking-widest">Class of '87</p>
-            <p className="text-[10px] text-gold/60 uppercase tracking-widest">Admin Panel</p>
-          </div>
+        <Link to="/" className={`flex items-center border-b border-white/5 group ${collapsed ? 'justify-center px-2 py-5' : 'gap-3 px-5 py-5'}`}>
+          <img src="/logo.png" alt="TOP87" className="w-9 h-9 object-contain shrink-0" />
+          {!collapsed && (
+            <div>
+              <p className="text-xs font-bold text-white uppercase tracking-widest">Class of '87</p>
+              <p className="text-[10px] text-gold/60 uppercase tracking-widest">Admin Panel</p>
+            </div>
+          )}
         </Link>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
           {financeOnly ? (
             <>
-              <p className="px-3 mb-2 text-[10px] uppercase tracking-widest text-gray-600">Finance</p>
-              {financeOnlyLinks.map(({ to, label, icon: Icon, end }) => (
-                <NavLink key={to} to={to} end={end} className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all group ${isActive ? 'bg-gold/10 text-gold border border-gold/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`
-                }>
-                  <Icon size={16} /><span className="flex-1">{label}</span>
-                  <ChevronRight size={12} className="opacity-0 group-hover:opacity-40 transition-opacity" />
-                </NavLink>
-              ))}
+              {!collapsed && <p className="px-3 mb-2 text-[10px] uppercase tracking-widest text-gray-600">Finance</p>}
+              {renderLinks(financeOnlyLinks)}
             </>
           ) : (
             <>
-              <p className="px-3 mb-2 text-[10px] uppercase tracking-widest text-gray-600">Charter Admin</p>
-              {adminLinks.map(({ to, label, icon: Icon, end }) => (
-                <NavLink key={to} to={to} end={end} className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all group ${isActive ? 'bg-gold/10 text-gold border border-gold/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`
-                }>
-                  <Icon size={16} /><span className="flex-1">{label}</span>
-                  <ChevronRight size={12} className="opacity-0 group-hover:opacity-40 transition-opacity" />
-                </NavLink>
-              ))}
+              {!collapsed && <p className="px-3 mb-2 text-[10px] uppercase tracking-widest text-gray-600">Charter Admin</p>}
+              {renderLinks(adminLinks)}
 
               {isSuperAdmin && (
                 <>
-                  <p className="px-3 mt-6 mb-2 text-[10px] uppercase tracking-widest text-gray-600">Super Admin</p>
-                  {superAdminLinks.map(({ to, label, icon: Icon, end }) => (
-                    <NavLink key={to} to={to} end={end} className={({ isActive }) =>
-                      `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all group ${isActive ? 'bg-gold/10 text-gold border border-gold/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`
-                    }>
-                      <Icon size={16} /><span className="flex-1">{label}</span>
-                      <ChevronRight size={12} className="opacity-0 group-hover:opacity-40 transition-opacity" />
-                    </NavLink>
-                  ))}
+                  {!collapsed && <p className="px-3 mt-5 mb-2 text-[10px] uppercase tracking-widest text-gray-600">Super Admin</p>}
+                  {collapsed && <div className="my-2 border-t border-white/5" />}
+                  {renderLinks(superAdminLinks)}
                 </>
               )}
             </>
           )}
+
+          {/* Collapse toggle */}
+          <div className={`mt-4 pt-3 border-t border-white/5 flex ${collapsed ? 'justify-center' : 'justify-end pr-1'}`}>
+            <button
+              onClick={toggle}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className="p-2 rounded-lg text-gray-600 hover:text-gold hover:bg-white/5 transition-all"
+            >
+              {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+            </button>
+          </div>
         </nav>
 
-        {/* Current user footer */}
-        <div className="px-4 py-4 border-t border-white/5 space-y-3">
-          <div className="flex items-center gap-3">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt={displayName} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full object-cover" />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-gold/20 flex items-center justify-center">
-                <span className="text-xs font-bold text-gold">{displayName.charAt(0)}</span>
-              </div>
-            )}
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-white truncate">{displayName}</p>
-              <p className="text-[10px] text-gold/60 uppercase tracking-widest">
-                {isSuperAdmin ? 'Super Admin' : isAdmin ? 'Charter Admin' : 'Finance Admin'}
-              </p>
+        {/* User footer */}
+        <div className="border-t border-white/5">
+          {collapsed ? (
+            <div className="flex flex-col items-center gap-2 py-3">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={displayName} referrerPolicy="no-referrer"
+                  className="w-8 h-8 rounded-full object-cover" title={displayName} />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-gold/20 flex items-center justify-center" title={displayName}>
+                  <span className="text-xs font-bold text-gold">{displayName.charAt(0)}</span>
+                </div>
+              )}
+              <button onClick={signOut} title="Sign out"
+                className="text-gray-600 hover:text-red-400 transition-colors p-1">
+                <LogOut size={12} />
+              </button>
             </div>
-          </div>
-          <div className="flex gap-2">
-            <Link to="/" className="flex-1 text-center text-[10px] uppercase tracking-widest text-gray-600 hover:text-gold transition-colors py-1">
-              ← Site
-            </Link>
-            <button
-              onClick={toggleTheme}
-              title={theme === 'dark' ? 'Mode Terang' : 'Mode Gelap'}
-              className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-gray-600 hover:text-gold transition-colors py-1 px-2"
-            >
-              {theme === 'dark' ? <Sun size={10} /> : <Moon size={10} />}
-            </button>
-            <button
-              onClick={() => setHelpOpen(true)}
-              className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-gray-600 hover:text-gold transition-colors py-1 px-2"
-              title="Panduan Pengguna"
-            >
-              <CircleHelp size={10} /> Help
-            </button>
-            <button
-              onClick={signOut}
-              className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-gray-600 hover:text-red-400 transition-colors py-1 px-2"
-            >
-              <LogOut size={10} /> Out
-            </button>
-          </div>
+          ) : (
+            <div className="px-4 py-4 space-y-3">
+              <div className="flex items-center gap-3">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={displayName} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full object-cover" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gold/20 flex items-center justify-center">
+                    <span className="text-xs font-bold text-gold">{displayName.charAt(0)}</span>
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-white truncate">{displayName}</p>
+                  <p className="text-[10px] text-gold/60 uppercase tracking-widest">
+                    {isSuperAdmin ? 'Super Admin' : isAdmin ? 'Charter Admin' : 'Finance Admin'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Link to="/" className="flex-1 text-center text-[10px] uppercase tracking-widest text-gray-600 hover:text-gold transition-colors py-1">
+                  ← Site
+                </Link>
+                <button
+                  onClick={toggleTheme}
+                  title={theme === 'dark' ? 'Mode Terang' : 'Mode Gelap'}
+                  className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-gray-600 hover:text-gold transition-colors py-1 px-2"
+                >
+                  {theme === 'dark' ? <Sun size={10} /> : <Moon size={10} />}
+                </button>
+                <button
+                  onClick={() => setHelpOpen(true)}
+                  className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-gray-600 hover:text-gold transition-colors py-1 px-2"
+                  title="Panduan Pengguna"
+                >
+                  <CircleHelp size={10} /> Help
+                </button>
+                <button
+                  onClick={signOut}
+                  className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-gray-600 hover:text-red-400 transition-colors py-1 px-2"
+                >
+                  <LogOut size={10} /> Out
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 ml-60 min-h-screen relative">
+      <div className={`flex-1 ${contentL} min-h-screen relative transition-all duration-200`}>
         {backdropUrl && (
           <>
             <div
-              className="fixed inset-y-0 right-0 left-60 bg-cover bg-center"
+              className={`fixed inset-y-0 right-0 ${backdropL} bg-cover bg-center transition-all duration-200`}
               style={{ backgroundImage: `url(${backdropUrl})`, zIndex: -2 }}
             />
             <div
-              className="fixed inset-y-0 right-0 left-60"
+              className={`fixed inset-y-0 right-0 ${backdropL} transition-all duration-200`}
               style={{ backgroundColor: `rgba(10, 10, 10, ${backdropOpacity / 100})`, zIndex: -1 }}
             />
           </>

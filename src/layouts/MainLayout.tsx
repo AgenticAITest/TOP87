@@ -3,7 +3,7 @@ import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Receipt, ShoppingBag, Heart, Megaphone, HelpCircle,
   Users, Image as ImageIcon, MapPin, BookOpen, Bell, LogOut, Menu, X,
-  ShieldCheck, Info, CircleHelp, Sun, Moon,
+  ShieldCheck, Info, CircleHelp, Sun, Moon, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminStatus } from '../hooks/useAdminStatus';
@@ -51,7 +51,13 @@ function NavItem({
   );
 }
 
-function SidebarInner({ onClose }: { onClose?: () => void }) {
+function SidebarInner({
+  onClose,
+  onCollapse,
+}: {
+  onClose?: () => void;
+  onCollapse?: () => void;
+}) {
   const { user, profile, signOut, signInWithGoogle } = useAuth();
   const { isAdmin } = useAdminStatus();
   const { data: flags } = useFeatureFlags();
@@ -66,6 +72,16 @@ function SidebarInner({ onClose }: { onClose?: () => void }) {
     <>
       {/* Brand */}
       <div className="p-8 text-center flex flex-col items-center border-b border-green-900/50 relative z-10">
+        {/* Collapse button — desktop only, top-right of brand block */}
+        {onCollapse && (
+          <button
+            onClick={onCollapse}
+            title="Collapse sidebar"
+            className="absolute top-3 right-3 p-1.5 rounded-lg text-white/20 hover:text-white/60 hover:bg-white/5 transition-all"
+          >
+            <ChevronLeft size={14} />
+          </button>
+        )}
         <div className="w-20 h-20 rounded-full border-2 border-gold/60 flex items-center justify-center mb-4">
           <div>
             <div className="text-xl font-bold text-gold font-serif leading-none">TOP87</div>
@@ -197,16 +213,46 @@ function SidebarInner({ onClose }: { onClose?: () => void }) {
 }
 
 export default function MainLayout() {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [helpOpen,   setHelpOpen]   = useState(false);
+  const [mobileOpen,       setMobileOpen]       = useState(false);
+  const [helpOpen,         setHelpOpen]         = useState(false);
+  const [desktopCollapsed, setDesktopCollapsed] = useState(
+    () => localStorage.getItem('main-sidebar-collapsed') === 'true'
+  );
   const { isSuperAdmin, isAdmin: isCharterAdmin } = useAdminStatus();
+
+  function collapseDesktop() {
+    setDesktopCollapsed(true);
+    localStorage.setItem('main-sidebar-collapsed', 'true');
+  }
+  function expandDesktop() {
+    setDesktopCollapsed(false);
+    localStorage.setItem('main-sidebar-collapsed', 'false');
+  }
 
   return (
     <div className="flex min-h-screen">
-      {/* Desktop sidebar — sticky, never scrolls with page */}
-      <aside className="sidebar-bg w-64 flex-shrink-0 text-white flex-col border-r border-green-900 sticky top-0 h-screen overflow-y-auto z-10 hidden md:flex">
-        <SidebarInner />
+      {/* Desktop sidebar */}
+      <aside
+        className={`sidebar-bg flex-shrink-0 text-white flex-col border-r border-green-900 sticky top-0 h-screen overflow-hidden z-10 hidden md:flex transition-[width] duration-200 ${
+          desktopCollapsed ? 'w-0 border-r-0' : 'w-64'
+        }`}
+      >
+        {/* min-w prevents content from squishing during the slide animation */}
+        <div className="min-w-[256px] h-full flex flex-col">
+          <SidebarInner onCollapse={collapseDesktop} />
+        </div>
       </aside>
+
+      {/* Re-open tab — only visible on desktop when sidebar is collapsed */}
+      {desktopCollapsed && (
+        <button
+          onClick={expandDesktop}
+          title="Open sidebar"
+          className="hidden md:flex fixed left-0 top-1/2 -translate-y-1/2 z-30 flex-col items-center justify-center gap-1 bg-[#0d2b1f] border border-green-900 border-l-0 rounded-r-lg px-1 py-4 text-gold/40 hover:text-gold transition-colors shadow-lg"
+        >
+          <ChevronRight size={14} />
+        </button>
+      )}
 
       {/* Mobile overlay */}
       {mobileOpen && (
