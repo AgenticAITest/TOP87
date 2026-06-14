@@ -11,29 +11,32 @@ import { qk, fetchSiteSetting } from '../lib/queries';
 
 // ── Defaults (shown when CMS row not yet created) ─────────────────────────────
 
-const DEFAULT_REUNION_ISO  = '2027-04-29T17:00:00+07:00';
-const DEFAULT_QUOTA        = 122;
-const DEFAULT_HERO_TITLE   = 'Sekarang Aku Menjadi Dewasa';
-const DEFAULT_HERO_SUB     = '"Jika bukan kita yang merayakan, siapa lagi?"';
-const DEFAULT_HERO_DATE    = '29 – 30 April 2027';
-const DEFAULT_HERO_VENUE   = 'BANDUNG / CIWIDEY';
-const DEFAULT_BUDGET_NOTE  =
-  'Target dana terkumpul Rp 247.000.000. Selisih dana akan dialokasikan untuk Dana Sosial/Beasiswa & Yatim.';
+const DEFAULT_REUNION_ISO = '2027-04-29T17:00:00+07:00';
+const DEFAULT_HERO_TITLE  = 'Sekarang Aku Menjadi Dewasa';
+const DEFAULT_HERO_SUB    = '"Jika bukan kita yang merayakan, siapa lagi?"';
+const DEFAULT_HERO_DATE   = '29 – 30 April 2027';
+const DEFAULT_HERO_VENUE  = 'BANDUNG / CIWIDEY';
+const DEFAULT_BUDGET_NOTE =
+  'Selisih dana yang terkumpul akan dialokasikan untuk Dana Sosial, Beasiswa & Yatim.';
 
-interface BudgetItem {
-  no?: number;
-  keterangan: string;
-  total: string;
-  per_orang: string;
-  is_total?: boolean;
+interface AnggaranConfig {
+  mode: 'per_person' | 'per_category';
+  quota: number;
+  items: { keterangan: string; amount: number }[];
 }
 
-const DEFAULT_BUDGET: BudgetItem[] = [
-  { no: 1, keterangan: 'Akomodasi & Konsumsi Resort',         total: 'Rp 105.230.000', per_orang: 'Rp 863.000'   },
-  { no: 2, keterangan: 'Lunch Hari Pertama (Prasmanan Sunda)', total: 'Rp 15.258.000',  per_orang: 'Rp 125.000'   },
-  { no: 3, keterangan: 'Outdoor Activity & Games',            total: 'Rp 25.620.000',  per_orang: 'Rp 210.000'   },
-];
-const DEFAULT_BUDGET_TOTAL = { total: 'Rp 246.108.000', per_orang: 'Rp 2.017.000' };
+const DEFAULT_ANGGARAN_CONFIG: AnggaranConfig = {
+  mode: 'per_person',
+  quota: 122,
+  items: [
+    { keterangan: 'Akomodasi & Konsumsi Resort',          amount: 863000 },
+    { keterangan: 'Lunch Hari Pertama (Prasmanan Sunda)', amount: 125000 },
+    { keterangan: 'Outdoor Activity & Games',             amount: 210000 },
+    { keterangan: 'Transportasi & Logistik',              amount: 200000 },
+    { keterangan: 'Dokumentasi & Kenang-kenangan',        amount: 250000 },
+    { keterangan: 'Panitia & Lain-lain',                  amount: 369000 },
+  ],
+};
 
 const DEFAULT_ANNOUNCEMENTS = [
   { title: 'Kostum Hari Ke-1: Putih',    body: 'Ayo seragamkan dresscode agar dokumentasi terlihat kompak!',                         highlight: true  },
@@ -76,37 +79,30 @@ export default function Landing() {
   });
 
   // CMS values with fallbacks
-  const heroTitle    = landingCms?.['hero.title']              ?? DEFAULT_HERO_TITLE;
-  const heroSub      = landingCms?.['hero.subtitle']           ?? DEFAULT_HERO_SUB;
-  const heroDate     = landingCms?.['hero.date']               ?? DEFAULT_HERO_DATE;
-  const heroVenue    = landingCms?.['hero.venue']              ?? DEFAULT_HERO_VENUE;
-  const heroBgUrl    = landingCms?.['hero.image_url']          ?? '';
-  const heroCta      = landingCms?.['hero.cta_label']          ?? 'Daftar Sekarang';
-  const reunionIso   = landingCms?.['reunion.date_iso']        ?? DEFAULT_REUNION_ISO;
-  const quotaTarget  = parseInt(landingCms?.['reunion.quota_target'] ?? String(DEFAULT_QUOTA), 10);
-  const budgetNote   = anggaranCms?.['notes.body']             ?? DEFAULT_BUDGET_NOTE;
+  const heroTitle  = landingCms?.['hero.title']     ?? DEFAULT_HERO_TITLE;
+  const heroSub    = landingCms?.['hero.subtitle']  ?? DEFAULT_HERO_SUB;
+  const heroDate   = landingCms?.['hero.date']      ?? DEFAULT_HERO_DATE;
+  const heroVenue  = landingCms?.['hero.venue']     ?? DEFAULT_HERO_VENUE;
+  const heroBgUrl  = landingCms?.['hero.image_url'] ?? '';
+  const heroCta    = landingCms?.['hero.cta_label'] ?? 'Daftar Sekarang';
+  const reunionIso = landingCms?.['reunion.date_iso'] ?? DEFAULT_REUNION_ISO;
+  const budgetNote = anggaranCms?.['notes.body']    ?? DEFAULT_BUDGET_NOTE;
 
-  // Parse budget items from CMS JSON or fall back to defaults
-  let budgetItems = DEFAULT_BUDGET;
-  let budgetTotal = DEFAULT_BUDGET_TOTAL;
-  if (anggaranCms?.['items.data']) {
-    try {
-      const parsed: BudgetItem[] = JSON.parse(anggaranCms['items.data']);
-      const totalRow = parsed.find(r => r.is_total);
-      budgetItems = parsed.filter(r => !r.is_total);
-      if (totalRow) budgetTotal = { total: totalRow.total, per_orang: totalRow.per_orang };
-    } catch { /* use defaults */ }
+  // Parse anggaran config — single source of truth for budget table, quota, and KPI target
+  let anggaranConfig = DEFAULT_ANGGARAN_CONFIG;
+  if (anggaranCms?.['items.config']) {
+    try { anggaranConfig = JSON.parse(anggaranCms['items.config']) as AnggaranConfig; }
+    catch { /* use defaults */ }
   }
 
-  const danaTargetMode   = landingCms?.['reunion.dana_target_mode']   ?? 'budget_total';
-  const danaTargetManual = parseInt(landingCms?.['reunion.dana_target_manual'] ?? '0', 10) || 0;
-  const budgetTargetFromTable = (() => {
-    if (danaTargetMode === 'per_orang_x_quota')
-      return (parseInt(budgetTotal.per_orang.replace(/[^0-9]/g, ''), 10) || 0) * quotaTarget;
-    if (danaTargetMode === 'manual')
-      return danaTargetManual;
-    return parseInt(budgetTotal.total.replace(/[^0-9]/g, ''), 10) || 0;
-  })();
+  const anggaranMode  = anggaranConfig.mode  ?? 'per_person';
+  const anggaranItems = anggaranConfig.items ?? DEFAULT_ANGGARAN_CONFIG.items;
+  const quotaTarget   = anggaranConfig.quota ?? DEFAULT_ANGGARAN_CONFIG.quota;
+
+  const sumAmount           = anggaranItems.reduce((s, i) => s + (i.amount || 0), 0);
+  const budgetTargetFromTable = anggaranMode === 'per_person' ? sumAmount * quotaTarget : sumAmount;
+  const grandPerOrang         = anggaranMode === 'per_person' ? sumAmount
+                                : (quotaTarget > 0 ? Math.round(sumAmount / quotaTarget) : 0);
 
   const countdown         = useCountdown(reunionIso);
   const approvedCount     = dashboard?.approvedCount ?? 0;
@@ -506,10 +502,10 @@ export default function Landing() {
 
             {/* Dana Terkumpul */}
             {flags?.donations && (() => {
-              const dana        = (dashboard?.totalDana?.reunion_fee ?? 0)
-                                + (dashboard?.totalDana?.donation ?? 0)
-                                + (flags.merchandise ? (dashboard?.totalDana?.merchandise_margin ?? 0) : 0);
-              const target      = dashboard?.budgetTarget ?? 247_000_000;
+              const dana   = (dashboard?.totalDana?.reunion_fee ?? 0)
+                           + (dashboard?.totalDana?.donation ?? 0)
+                           + (flags.merchandise ? (dashboard?.totalDana?.merchandise_margin ?? 0) : 0);
+              const target = budgetTargetFromTable;
               const pct         = target > 0 ? Math.min(Math.round((dana / target) * 100), 100) : 0;
               return (
                 <div>
@@ -594,18 +590,22 @@ export default function Landing() {
                 </tr>
               </thead>
               <tbody className="text-gray-800 dark:text-gray-200">
-                {budgetItems.map((item, i) => (
-                  <tr key={i} className="border-b border-amber-100 dark:border-amber-900/20">
-                    <td className="py-4 text-gray-500 dark:text-gray-400">{item.no ?? i + 1}</td>
-                    <td className="py-4 font-medium">{item.keterangan}</td>
-                    <td className="py-4 text-right whitespace-nowrap">{item.total}</td>
-                    <td className="py-4 text-right whitespace-nowrap">{item.per_orang}</td>
-                  </tr>
-                ))}
+                {anggaranItems.map((item, i) => {
+                  const perOrang   = anggaranMode === 'per_person' ? item.amount : Math.round(item.amount / (quotaTarget || 1));
+                  const totalBiaya = anggaranMode === 'per_person' ? item.amount * quotaTarget : item.amount;
+                  return (
+                    <tr key={i} className="border-b border-amber-100 dark:border-amber-900/20">
+                      <td className="py-4 text-gray-500 dark:text-gray-400">{i + 1}</td>
+                      <td className="py-4 font-medium">{item.keterangan}</td>
+                      <td className="py-4 text-right whitespace-nowrap">Rp {totalBiaya.toLocaleString('id-ID')}</td>
+                      <td className="py-4 text-right whitespace-nowrap">Rp {perOrang.toLocaleString('id-ID')}</td>
+                    </tr>
+                  );
+                })}
                 <tr className="font-bold text-gray-900 dark:text-gray-100 bg-amber-50 dark:bg-amber-900/10">
                   <td className="py-4 px-2" colSpan={2}>TOTAL ANGGARAN REUNI</td>
-                  <td className="py-4 text-right whitespace-nowrap">{budgetTotal.total}</td>
-                  <td className="py-4 text-right whitespace-nowrap">{budgetTotal.per_orang}</td>
+                  <td className="py-4 text-right whitespace-nowrap">Rp {budgetTargetFromTable.toLocaleString('id-ID')}</td>
+                  <td className="py-4 text-right whitespace-nowrap">Rp {grandPerOrang.toLocaleString('id-ID')}</td>
                 </tr>
               </tbody>
             </table>

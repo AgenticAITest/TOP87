@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, Fragment, type ChangeEvent } from 'react';
-import { Check, Loader, RotateCcw, AlertCircle, Upload } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo, Fragment, type ChangeEvent } from 'react';
+import { Check, Loader, RotateCcw, AlertCircle, Upload, Plus, Eye, X } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchPageContent, upsertField, type ContentType } from '../../lib/cms';
 import { useAuth } from '../../contexts/AuthContext';
@@ -58,19 +58,7 @@ const PAGES: Record<string, PageDef> = {
       reunion: {
         label: 'Reunion Info',
         fields: {
-          date_iso:     { label: 'Reunion start date (ISO 8601)', type: 'text', hint: 'e.g. 2027-05-10T08:00:00+07:00 — drives the countdown clock.' },
-          quota_target: { label: 'Target attendees (quota)',      type: 'text', hint: 'Integer, e.g. 122. Used for the Kehadiran Alumni progress bar.' },
-          dana_target_mode: {
-            label: 'Target dana — cara kalkulasi',
-            type: 'select',
-            hint: 'Pilih bagaimana target pada progress bar Total Dana Terkumpul dihitung.',
-            options: [
-              { value: 'budget_total',      label: 'Dari tabel anggaran',    description: 'Membaca baris total (is_total) kolom "Total Biaya" di tabel anggaran.' },
-              { value: 'per_orang_x_quota', label: 'Per orang × kuota',      description: 'Biaya per orang (baris total anggaran) × target kehadiran. Cocok jika flyer hanya mencantumkan biaya per orang.' },
-              { value: 'manual',            label: 'Manual entry',            description: 'Admin memasukkan angka target langsung di field di bawah.' },
-            ],
-          },
-          dana_target_manual: { label: 'Target dana manual (Rp)', type: 'text', hint: 'Hanya digunakan jika mode di atas adalah "Manual entry". Masukkan angka saja, contoh: 246108000' },
+          date_iso: { label: 'Reunion start date (ISO 8601)', type: 'text', hint: 'e.g. 2027-04-29T17:00:00+07:00 — drives the countdown clock.' },
         },
       },
     },
@@ -79,15 +67,8 @@ const PAGES: Record<string, PageDef> = {
     label: 'Anggaran & Transparansi',
     sections: {
       items: {
-        label: 'Budget Table',
-        fields: {
-          data: {
-            label: 'Budget items (JSON)',
-            type: 'json',
-            rows: 12,
-            hint: 'Array of {no, keterangan, total, per_orang}. Add {is_total: true} on the grand-total row.',
-          },
-        },
+        label: 'Rincian Anggaran',
+        fields: {},
       },
       notes: {
         label: 'Footer Note',
@@ -135,6 +116,24 @@ const PAGES: Record<string, PageDef> = {
 
 const PAGE_KEYS = Object.keys(PAGES);
 
+// ─── Anggaran config type & defaults ──────────────────────────────────────────
+
+interface AnggaranItem { keterangan: string; amount: number; }
+interface AnggaranConfig { mode: 'per_person' | 'per_category'; quota: number; items: AnggaranItem[]; }
+
+const DEFAULT_ANGGARAN_CONFIG: AnggaranConfig = {
+  mode: 'per_person',
+  quota: 122,
+  items: [
+    { keterangan: 'Akomodasi & Konsumsi Resort',          amount: 863000 },
+    { keterangan: 'Lunch Hari Pertama (Prasmanan Sunda)', amount: 125000 },
+    { keterangan: 'Outdoor Activity & Games',             amount: 210000 },
+    { keterangan: 'Transportasi & Logistik',              amount: 200000 },
+    { keterangan: 'Dokumentasi & Kenang-kenangan',        amount: 250000 },
+    { keterangan: 'Panitia & Lain-lain',                  amount: 369000 },
+  ],
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function tryFormatJson(raw: string): string {
@@ -143,6 +142,212 @@ function tryFormatJson(raw: string): string {
 
 function isValidJson(raw: string): boolean {
   try { JSON.parse(raw); return true; } catch { return false; }
+}
+
+// ─── Anggaran editor ──────────────────────────────────────────────────────────
+
+function AnggaranEditor({ initialJson, onSaved }: { initialJson: string; onSaved: () => void }) {
+  const initial = useMemo<AnggaranConfig>(() => {
+    try { return JSON.parse(initialJson) as AnggaranConfig; } catch { return DEFAULT_ANGGARAN_CONFIG; }
+  }, [initialJson]);
+
+  const [mode,  setMode]  = useState<'per_person' | 'per_category'>(initial.mode  ?? 'per_person');
+  const [quota, setQuota] = useState<number>(initial.quota ?? 122);
+  const [items, setItems] = useState<AnggaranItem[]>(
+    initial.items?.length ? initial.items : DEFAULT_ANGGARAN_CONFIG.items
+  );
+  const [showPreview, setShowPreview] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setMode(initial.mode ?? 'per_person');
+    setQuota(initial.quota ?? 122);
+    setItems(initial.items?.length ? initial.items : DEFAULT_ANGGARAN_CONFIG.items);
+  }, [initial]);
+
+  const initialNorm = useMemo(() => {
+    try { return JSON.stringify(JSON.parse(initialJson)); }
+    catch { return JSON.stringify(DEFAULT_ANGGARAN_CONFIG); }
+  }, [initialJson]);
+
+  const isDirty = JSON.stringify({ mode, quota, items }) !== initialNorm;
+
+  const sumAmount      = items.reduce((s, i) => s + (i.amount || 0), 0);
+  const grandTotal     = mode === 'per_person' ? sumAmount * quota : sumAmount;
+  const grandPerOrang  = mode === 'per_person' ? sumAmount : (quota > 0 ? Math.round(sumAmount / quota) : 0);
+
+  const { mutate, isPending, isError, error } = useMutation({
+    mutationFn: () => upsertField('anggaran', 'items', 'config', JSON.stringify({ mode, quota, items }), 'json'),
+    onSuccess: () => { setSaved(true); onSaved(); setTimeout(() => setSaved(false), 2000); },
+  });
+
+  function updateItem(idx: number, field: keyof AnggaranItem, val: string) {
+    setItems(prev => prev.map((it, i) => i === idx
+      ? { ...it, [field]: field === 'amount' ? (parseInt(val, 10) || 0) : val }
+      : it
+    ));
+  }
+
+  const modeOptions = [
+    { value: 'per_person'   as const, label: 'Per Orang',    desc: 'Admin memasukkan biaya per orang. Total biaya = nilai × kuota.' },
+    { value: 'per_category' as const, label: 'Per Kategori', desc: 'Admin memasukkan total per kategori. Per orang = total ÷ kuota.' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Mode */}
+      <div>
+        <p className="text-xs uppercase tracking-widest text-gray-500 mb-3">Tampilkan angka per</p>
+        <div className="grid grid-cols-2 gap-3">
+          {modeOptions.map(opt => (
+            <button key={opt.value} type="button" onClick={() => setMode(opt.value)}
+              className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
+                mode === opt.value ? 'border-gold/40 bg-gold/5' : 'border-white/5 bg-white/[0.02] hover:border-white/10'
+              }`}>
+              <div className={`w-3.5 h-3.5 rounded-full border-2 mt-0.5 shrink-0 ${
+                mode === opt.value ? 'border-gold bg-gold' : 'border-gray-600'
+              }`} />
+              <div>
+                <p className={`text-sm font-medium ${mode === opt.value ? 'text-white' : 'text-gray-400'}`}>{opt.label}</p>
+                <p className="text-xs text-gray-600 mt-0.5 leading-snug">{opt.desc}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Quota */}
+      <div>
+        <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1.5">Target kehadiran (kuota alumni)</label>
+        <input type="number" value={quota} min={1}
+          onChange={e => setQuota(parseInt(e.target.value, 10) || 0)}
+          className="w-32 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors" />
+        <p className="text-[11px] text-gray-600 mt-1">
+          Digunakan untuk progress bar kehadiran dan kalkulasi total biaya (mode per orang).
+        </p>
+      </div>
+
+      {/* Items */}
+      <div>
+        <p className="text-xs uppercase tracking-widest text-gray-500 mb-3">
+          Rincian Anggaran
+          <span className="ml-2 text-gray-700 normal-case tracking-normal font-normal">
+            — masukkan {mode === 'per_person' ? 'biaya per orang (Rp)' : 'total per kategori (Rp)'}
+          </span>
+        </p>
+        <div className="space-y-2">
+          {items.map((item, idx) => {
+            const derivedLabel = mode === 'per_person'
+              ? `→ Total: Rp ${(item.amount * quota).toLocaleString('id-ID')}`
+              : `→ Per orang: Rp ${(quota > 0 ? Math.round(item.amount / quota) : 0).toLocaleString('id-ID')}`;
+            return (
+              <div key={idx} className="flex gap-2 items-center">
+                <span className="text-xs text-gray-600 w-5 text-right shrink-0">{idx + 1}</span>
+                <input value={item.keterangan} onChange={e => updateItem(idx, 'keterangan', e.target.value)}
+                  placeholder="Keterangan"
+                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors" />
+                <input type="number" value={item.amount || ''} onChange={e => updateItem(idx, 'amount', e.target.value)}
+                  placeholder="0"
+                  className="w-36 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm text-right focus:outline-none focus:border-gold/50 transition-colors" />
+                <span className="text-[10px] text-gray-600 w-44 shrink-0 hidden lg:block">{derivedLabel}</span>
+                <button type="button" onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}
+                  className="text-gray-600 hover:text-red-400 transition-colors p-1 shrink-0">
+                  <X size={14} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <button type="button" onClick={() => setItems(prev => [...prev, { keterangan: '', amount: 0 }])}
+          className="mt-3 text-xs text-gold/60 hover:text-gold transition-colors flex items-center gap-1.5">
+          <Plus size={12} /> Tambah baris
+        </button>
+      </div>
+
+      {/* Auto-totals */}
+      <div className="rounded-xl bg-white/[0.02] border border-white/5 p-4 space-y-2">
+        <p className="text-[10px] uppercase tracking-widest text-gray-600 mb-2">Kalkulasi Otomatis</p>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-400">Total Biaya</span>
+          <span className="text-white font-bold">Rp {grandTotal.toLocaleString('id-ID')}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-400">Per Orang</span>
+          <span className="text-white font-bold">Rp {grandPerOrang.toLocaleString('id-ID')}</span>
+        </div>
+        <p className="text-[10px] text-gray-600 pt-2 border-t border-white/5">
+          "Total Biaya" ini yang muncul di KPI card dana terkumpul pada dashboard.
+        </p>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-3 pt-1">
+        <button type="button" onClick={() => setShowPreview(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 text-gray-300 hover:text-white hover:border-white/20 bg-white/[0.02] transition-all text-sm">
+          <Eye size={14} /> Preview Tabel
+        </button>
+        {isDirty && (
+          <button type="button" onClick={() => mutate()} disabled={isPending}
+            className="flex items-center gap-2 bg-gold/15 hover:bg-gold/25 text-gold border border-gold/30 rounded-xl px-4 py-2 text-sm font-bold transition-all disabled:opacity-50">
+            {isPending ? <Loader size={13} className="animate-spin" /> : saved ? <Check size={13} /> : null}
+            {isPending ? 'Menyimpan…' : saved ? 'Tersimpan' : 'Simpan'}
+          </button>
+        )}
+        {isError && <p className="text-red-400 text-sm">{(error as Error).message}</p>}
+      </div>
+
+      {/* Preview modal */}
+      {showPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => setShowPreview(false)}>
+          <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 max-w-2xl w-full shadow-2xl"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="font-serif text-lg font-bold text-white">Preview Tabel Anggaran</h3>
+              <button onClick={() => setShowPreview(false)} className="text-gray-500 hover:text-white">
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-600 mb-4">
+              Tampilan ini sama persis dengan yang dilihat oleh member di halaman dashboard.
+              Kuota: {quota} orang.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-amber-200/30">
+                    <th className="py-2 font-medium text-gray-500 w-8">No</th>
+                    <th className="py-2 font-medium text-gray-500">Keterangan</th>
+                    <th className="py-2 font-medium text-gray-500 text-right whitespace-nowrap">Total Biaya</th>
+                    <th className="py-2 font-medium text-gray-500 text-right whitespace-nowrap">Per Orang</th>
+                  </tr>
+                </thead>
+                <tbody className="text-gray-200">
+                  {items.map((item, i) => {
+                    const perOrang   = mode === 'per_person' ? item.amount : Math.round(item.amount / (quota || 1));
+                    const totalBiaya = mode === 'per_person' ? item.amount * quota : item.amount;
+                    return (
+                      <tr key={i} className="border-b border-white/5">
+                        <td className="py-3 text-gray-500">{i + 1}</td>
+                        <td className="py-3 font-medium">{item.keterangan || '—'}</td>
+                        <td className="py-3 text-right">Rp {totalBiaya.toLocaleString('id-ID')}</td>
+                        <td className="py-3 text-right">Rp {perOrang.toLocaleString('id-ID')}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="font-bold text-white bg-amber-900/10">
+                    <td className="py-3 px-2" colSpan={2}>TOTAL ANGGARAN REUNI</td>
+                    <td className="py-3 text-right">Rp {grandTotal.toLocaleString('id-ID')}</td>
+                    <td className="py-3 text-right">Rp {grandPerOrang.toLocaleString('id-ID')}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Field component ──────────────────────────────────────────────────────────
@@ -372,25 +577,35 @@ export default function SiteCMSAdmin() {
           <div className="text-gray-600 text-xs uppercase tracking-widest animate-pulse">Loading…</div>
         ) : (
           <div className="max-w-2xl space-y-8">
-            {Object.entries(activePage.sections).map(([sectionKey, section]) => (
-              <section key={sectionKey} className="glass rounded-2xl p-6 space-y-6">
-                <h2 className="text-sm font-bold text-white uppercase tracking-widest border-b border-white/5 pb-3">
-                  {section.label}
-                </h2>
-                {Object.entries(section.fields).map(([fieldKey, def]) => (
-                  <Fragment key={fieldKey}>
-                    <FieldEditor
-                      pageKey={activePageKey}
-                      sectionKey={sectionKey}
-                      fieldKey={fieldKey}
-                      def={def}
-                      initialValue={cms[`${sectionKey}.${fieldKey}`] ?? ''}
+            {Object.entries(activePage.sections).map(([sectionKey, section]) => {
+              const isAnggaranItems = activePageKey === 'anggaran' && sectionKey === 'items';
+              return (
+                <section key={sectionKey} className="glass rounded-2xl p-6 space-y-6">
+                  <h2 className="text-sm font-bold text-white uppercase tracking-widest border-b border-white/5 pb-3">
+                    {section.label}
+                  </h2>
+                  {isAnggaranItems ? (
+                    <AnggaranEditor
+                      initialJson={cms['items.config'] ?? ''}
                       onSaved={onFieldSaved}
                     />
-                  </Fragment>
-                ))}
-              </section>
-            ))}
+                  ) : (
+                    Object.entries(section.fields).map(([fieldKey, def]) => (
+                      <Fragment key={fieldKey}>
+                        <FieldEditor
+                          pageKey={activePageKey}
+                          sectionKey={sectionKey}
+                          fieldKey={fieldKey}
+                          def={def}
+                          initialValue={cms[`${sectionKey}.${fieldKey}`] ?? ''}
+                          onSaved={onFieldSaved}
+                        />
+                      </Fragment>
+                    ))
+                  )}
+                </section>
+              );
+            })}
           </div>
         )}
       </div>
