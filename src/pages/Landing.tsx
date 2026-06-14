@@ -98,7 +98,15 @@ export default function Landing() {
     } catch { /* use defaults */ }
   }
 
-  const budgetTargetFromTable = parseInt(budgetTotal.total.replace(/[^0-9]/g, ''), 10) || 0;
+  const danaTargetMode   = landingCms?.['reunion.dana_target_mode']   ?? 'budget_total';
+  const danaTargetManual = parseInt(landingCms?.['reunion.dana_target_manual'] ?? '0', 10) || 0;
+  const budgetTargetFromTable = (() => {
+    if (danaTargetMode === 'per_orang_x_quota')
+      return (parseInt(budgetTotal.per_orang.replace(/[^0-9]/g, ''), 10) || 0) * quotaTarget;
+    if (danaTargetMode === 'manual')
+      return danaTargetManual;
+    return parseInt(budgetTotal.total.replace(/[^0-9]/g, ''), 10) || 0;
+  })();
 
   const countdown         = useCountdown(reunionIso);
   const approvedCount     = dashboard?.approvedCount ?? 0;

@@ -7,12 +7,15 @@ import { uploadFile, resolveMediaUrl } from '../../lib/storage';
 
 // ─── Page / field schema ──────────────────────────────────────────────────────
 
+interface SelectOption { value: string; label: string; description?: string; }
+
 interface FieldDef {
   label: string;
-  type: ContentType;
+  type: ContentType | 'select';
   hint?: string;
   rows?: number;
   template?: string;
+  options?: SelectOption[];
 }
 interface SectionDef {
   label: string;
@@ -57,6 +60,17 @@ const PAGES: Record<string, PageDef> = {
         fields: {
           date_iso:     { label: 'Reunion start date (ISO 8601)', type: 'text', hint: 'e.g. 2027-05-10T08:00:00+07:00 — drives the countdown clock.' },
           quota_target: { label: 'Target attendees (quota)',      type: 'text', hint: 'Integer, e.g. 122. Used for the Kehadiran Alumni progress bar.' },
+          dana_target_mode: {
+            label: 'Target dana — cara kalkulasi',
+            type: 'select',
+            hint: 'Pilih bagaimana target pada progress bar Total Dana Terkumpul dihitung.',
+            options: [
+              { value: 'budget_total',      label: 'Dari tabel anggaran',    description: 'Membaca baris total (is_total) kolom "Total Biaya" di tabel anggaran.' },
+              { value: 'per_orang_x_quota', label: 'Per orang × kuota',      description: 'Biaya per orang (baris total anggaran) × target kehadiran. Cocok jika flyer hanya mencantumkan biaya per orang.' },
+              { value: 'manual',            label: 'Manual entry',            description: 'Admin memasukkan angka target langsung di field di bawah.' },
+            ],
+          },
+          dana_target_manual: { label: 'Target dana manual (Rp)', type: 'text', hint: 'Hanya digunakan jika mode di atas adalah "Manual entry". Masukkan angka saja, contoh: 246108000' },
         },
       },
     },
@@ -155,7 +169,10 @@ function FieldEditor({
     ? 'Invalid JSON' : null;
 
   const { mutate, isPending, isError, error } = useMutation({
-    mutationFn: () => upsertField(pageKey, sectionKey, fieldKey, value.trim(), def.type),
+    mutationFn: () => upsertField(
+      pageKey, sectionKey, fieldKey, value.trim(),
+      def.type === 'select' ? 'text' : def.type
+    ),
     onSuccess: () => {
       setSaved(true);
       onSaved();
@@ -199,7 +216,34 @@ function FieldEditor({
         )}
       </div>
 
-      {def.type === 'image_url' ? (
+      {def.type === 'select' && def.options ? (
+        <div className="space-y-2">
+          {def.options.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setValue(opt.value)}
+              className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
+                value === opt.value
+                  ? 'border-gold/40 bg-gold/5'
+                  : 'border-white/5 bg-white/[0.02] hover:border-white/10'
+              }`}
+            >
+              <div className={`w-3.5 h-3.5 rounded-full border-2 mt-0.5 shrink-0 transition-all ${
+                value === opt.value ? 'border-gold bg-gold' : 'border-gray-600'
+              }`} />
+              <div className="min-w-0">
+                <p className={`text-sm font-medium ${value === opt.value ? 'text-white' : 'text-gray-400'}`}>
+                  {opt.label}
+                </p>
+                {opt.description && (
+                  <p className="text-xs text-gray-600 mt-0.5 leading-snug">{opt.description}</p>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      ) : def.type === 'image_url' ? (
         <div className="space-y-2">
           <div className="flex gap-2">
             <input
