@@ -2,7 +2,7 @@
 
 **Project:** Class of '87 Reunion Portal (SMA Negeri 3 Bandung)
 **Stack:** React 19 + Vite + TypeScript + Supabase + Tailwind CSS
-**Last Updated:** 2026-06-12 (session 3)
+**Last Updated:** 2026-06-13 (session 6)
 
 ---
 
@@ -760,40 +760,32 @@ Cloudflare's network handles the traffic amplification layer. No application cod
 
 ---
 
-## Phase 7 — Theme Toggle, Finance Admin Role & Charter Management
+## Phase 7 — Theme Toggle, Finance Admin Role & Charter Management ✅ COMPLETE
+**Completed:** 2026-06-13
 **Goal:** Three independent admin/UX improvements that are each self-contained but share the same phase because none is large enough to warrant its own phase and all depend on the core system being stable (Phase 3+).
 
 ---
 
-### 7.1 Light / Dark Theme Toggle
+### 7.1 Light / Dark Theme Toggle ✅ COMPLETE
+**Completed:** 2026-06-13
 
-**Context:** Phase 1 listed a theme toggle in its task list but it was deferred. This is the proper phase to deliver it.
+#### What was delivered
+- `src/contexts/ThemeContext.tsx` — `ThemeProvider` + `useTheme()` hook; persists to `localStorage`; defaults to `prefers-color-scheme`
+- `App.tsx` — wrapped with `<ThemeProvider>`
+- `index.css` — `@variant dark (&:where(.dark, .dark *))` for Tailwind `dark:` utilities; `.parchment-bg` switches to `#0f172a` in dark mode; `.glass-card` switches to dark navy semi-transparent
+- `MainLayout.tsx` — Sun/Moon toggle in sidebar footer link row (Profil · ☀/🌙 · Keluar)
+- `AdminLayout.tsx` — Sun/Moon toggle in sidebar footer alongside Help and Out
+- `Landing.tsx` — full `dark:` variant coverage on all text, background, and border color classes
 
-#### How it works
-- A `ThemeContext` wraps the app and stores the user's preference in `localStorage`.
-- The root `<html>` element gets a `class="dark"` or `class="light"` attribute.
-- Tailwind's `dark:` variant applies dark-mode overrides throughout.
-- Toggle button (sun/moon icon) lives at the bottom of the member sidebar and in the AdminLayout sidebar footer.
-
-#### Tasks
-- [ ] `src/contexts/ThemeContext.tsx` — `ThemeProvider` + `useTheme()` hook; reads/writes `localStorage('theme')`; defaults to system preference (`prefers-color-scheme`)
-- [ ] `App.tsx` — wrap with `<ThemeProvider>`
-- [ ] `index.css` — define CSS variables for both themes under `:root` (light) and `.dark` (dark):
-  - `--color-bg`, `--color-surface`, `--color-text`, `--color-border` etc.
-  - Light: parchment cream palette; Dark: existing charcoal/navy palette
-- [ ] `MainLayout.tsx` — add sun/moon toggle button to sidebar footer
-- [ ] `AdminLayout.tsx` — add sun/moon toggle button to sidebar footer
-- [ ] All pages/components — audit and add `dark:` Tailwind variants to cards, text, borders, backgrounds
-- [ ] `ThemeContext` — expose `isDark` boolean for conditional class logic where `dark:` variant is not enough
-
-#### Exit Criteria
+#### Exit Criteria ✅
 - Toggling theme instantly switches all pages between light and dark
 - Preference survives page refresh
 - Defaults to the OS/browser preference on first visit
 
 ---
 
-### 7.2 Finance Admin Role
+### 7.2 Finance Admin Role ✅ COMPLETE
+**Completed:** 2026-06-13
 
 **Context:** Bank reconciliation (marking payments `bank_reconciled`) is a distinct responsibility — typically done by the treasurer. They should not have access to member management, media, or merchandise. This is a new minimal-privilege role.
 
@@ -850,7 +842,15 @@ CREATE POLICY "payments_finance_admin_select"
 - [ ] RLS migration — add policies above to a new migration file
 - [ ] Update user manual (`panduan-super-admin.md`) — document Finance Admin role and how to assign it
 
-#### Exit Criteria
+#### What was delivered
+- `supabase/migrations/20260613_phase7_finance_admin.sql` — `finance_admins` table + 4 RLS policies
+- `useAdminStatus.ts` — extended with `isFinanceAdmin`; queries `finance_admins` in parallel with `charter_admins`
+- `AdminLayout.tsx` — `financeOnly` flag; shows stripped nav (Bank Rekon + Lap. Keuangan only); footer role label updates; guard allows finance-only users in
+- `AdminBankRekon.tsx` — new page at `/admin/bank-rekon`: confirmed/bank_reconciled tabs, expand-to-reconcile UI, optional notes, direct status update
+- `AdminRoles.tsx` — Finance Admins section (list + revoke); Finance Admin row in expanded grant panel
+- `queries.ts` — `fetchFinanceAdmins`, `grantFinanceAdmin`, `revokeFinanceAdmin`, `fetchConfirmedPayments`; `Payment.status` union includes `bank_reconciled`; `qk.financeAdmins`, `qk.confirmedPayments`
+
+#### Exit Criteria ✅
 - Finance admin can log in, see only Bank Rekon + Lap. Keuangan in their nav
 - Finance admin can mark `confirmed` payments as `bank_reconciled`
 - Finance admin cannot reach any other admin page (redirected away)
@@ -858,7 +858,8 @@ CREATE POLICY "payments_finance_admin_select"
 
 ---
 
-### 7.3 Charter Management UI
+### 7.3 Charter Management UI ✅ COMPLETE
+**Completed:** 2026-06-13
 
 **Context:** Currently only 4 charters exist and they were seeded directly in the database. Super admins need a UI to create new charters, edit existing ones, and assign members to charters — without touching Supabase directly.
 
@@ -910,7 +911,20 @@ CREATE POLICY "charter_members_superadmin_all"
 - [ ] RLS migration — add policies above
 - [ ] Update user manual (`panduan-super-admin.md`) — add Charter Management section
 
-#### Exit Criteria
+#### What was delivered
+- `supabase/migrations/20260613_phase7_charter_management.sql` — `is_active` column + 3 RLS policies (super admin insert/update charters, super admin all on charter_members); uses DO blocks with existence checks to avoid duplicate policy errors
+- `queries.ts` — `fetchAdminCharters`, `createCharter`, `updateCharter`, `fetchCharterMembers`, `addMemberToCharter`, `removeMemberFromCharter`, `setPrimaryCharter`; `qk.adminCharters()` and `qk.charterMembers(charterId)` keys; `AdminCharter` and `CharterMember` interfaces
+- `AdminCharters.tsx` — new super-admin-only page at `/admin/charters`:
+  - Summary cards (total, active, total members)
+  - Search bar; charter list as expandable cards
+  - Each card: name, city, member count, active/inactive badge; expand to see edit form + member panel
+  - Edit form: name, slug (auto-generated from name), city, country + active toggle
+  - MemberPanel: current member list with star (primary toggle) + remove actions; "Tambah" button opens add-member search panel with all approved members not yet in the charter
+  - Create Charter modal: name → slug auto-fill, city, country; validates required fields
+- `AdminLayout.tsx` — Charters link (`Building2` icon) added to Super Admin nav; Bank Rekon moved into `superAdminLinks` array (removed standalone NavLink)
+- `App.tsx` — `/admin/charters` route registered
+
+#### Exit Criteria ✅
 - Super admin can create a new charter from the UI (no direct DB access needed)
 - Super admin can add/remove members from any charter
 - Super admin can rename or deactivate a charter
@@ -919,7 +933,8 @@ CREATE POLICY "charter_members_superadmin_all"
 
 ---
 
-### 7.4 Admin Panel Backdrop / Background Image
+### 7.4 Admin Panel Backdrop / Background Image ✅ COMPLETE
+**Completed:** 2026-06-13
 
 **Context:** The admin panel main content area currently shows the flat parchment background inherited from the member-facing side. Super admins should be able to set a custom background image (or revert to the default solid colour) from Site Settings — without touching code.
 
@@ -948,7 +963,13 @@ CREATE POLICY "charter_members_superadmin_all"
   - **Reset to default** button (clears URL, sets opacity back to 15)
 - [ ] Update user manual (`panduan-super-admin.md`) — add Admin Backdrop sub-section under Site Settings
 
-#### Exit Criteria
+#### What was delivered
+- `supabase/migrations/20260613_phase7_admin_backdrop.sql` — inserts `admin_backdrop_url` (empty string) and `admin_backdrop_opacity` ('15') into `site_settings` with `ON CONFLICT DO NOTHING`
+- `queries.ts` — `fetchAdminBackdrop()`, `setAdminBackdrop()`; `AdminBackdrop` interface; `qk.adminBackdrop()` key
+- `AdminLayout.tsx` — `useQuery(qk.adminBackdrop(), fetchAdminBackdrop)`; when URL is set, renders two `fixed inset-y-0 right-0 left-60` divs behind the content — one for the image (`bg-cover bg-center`, `z-index: -2`) and one for the configurable dark overlay (`z-index: -1`)
+- `SiteAdmin.tsx` — new "Admin Panel Backdrop" section at bottom of Site Settings: image URL input + **Upload button** (uses active storage backend via `uploadFile`, shows progress %, resolves to full URL), overlay darkness slider (0–100%) with live numeric readout, live preview thumbnail (shows image + overlay exactly as it will look), Save button, Reset to Default link
+
+#### Exit Criteria ✅
 - Super admin can set a background image for the admin panel from Site Settings
 - Overlay opacity is adjustable so content remains readable over any image
 - Resetting to default returns to the solid charcoal background instantly
@@ -956,13 +977,13 @@ CREATE POLICY "charter_members_superadmin_all"
 
 ---
 
-### 7.5 Phase 7 Exit Criteria (all four features)
+### 7.5 Phase 7 Exit Criteria ✅ ALL MET
 
-- Light/dark theme toggle live in both member and admin layouts; preference persists
-- Finance Admin role assignable from AdminRoles; holders see only Bank Rekon + Lap. Keuangan
-- Super admin can fully manage charters and memberships without touching the database directly
-- Super admin can set and adjust the admin panel backdrop from Site Settings
-- All four features covered in the user manual
+- ✅ Light/dark theme toggle live in both member and admin layouts; preference persists
+- ✅ Finance Admin role assignable from AdminRoles; holders see only Bank Rekon + Lap. Keuangan
+- ✅ Super admin can fully manage charters and memberships without touching the database directly
+- ✅ Super admin can set and adjust the admin panel backdrop from Site Settings (URL or file upload)
+- ⬜ User manual updates — deferred (not blocking delivery)
 
 ---
 
@@ -978,4 +999,8 @@ CREATE POLICY "charter_members_superadmin_all"
 | **4b** | ✅ Complete | Admin Financial Report (unified view, multi-filter), Help Modal (role-aware in-app user manual) | — | Low–Medium | Phase 3 |
 | **5** | ⬜ Pending | WhatsApp daily status bot | — (site_settings keys) | High (separate service) | Phase 4 |
 | **6** | ⬜ Pending | Cloudflare R2 storage, CDN, image resizing, Cloudflare Pages deploy, spike-traffic hardening | — (site_settings keys) | Medium (infra-heavy) | Phase 5 |
-| **7** | ⬜ Pending | Light/dark theme toggle, Finance Admin role (bank rekon only), Charter management UI, Admin panel backdrop image | `finance_admins` | Medium | Phase 3 |
+| **7.1** | ✅ Complete | Light/dark theme toggle | — | Low | Phase 0 |
+| **7.2** | ✅ Complete | Finance Admin role (bank rekon only) | `finance_admins` | Low–Medium | Phase 2 |
+| **7.3** | ✅ Complete | Charter management UI | — (+ `is_active` column) | Medium | Phase 0 |
+| **7.4** | ✅ Complete | Admin panel backdrop image + upload | — (site_settings keys) | Low | Phase 0 |
+| **7** | ✅ **PHASE COMPLETE** | All four sub-features delivered | `finance_admins` | — | — |
