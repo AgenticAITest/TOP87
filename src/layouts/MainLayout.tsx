@@ -3,11 +3,12 @@ import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Receipt, ShoppingBag, Heart, Megaphone, HelpCircle,
   Users, Image as ImageIcon, MapPin, BookOpen, Bell, LogOut, Menu, X,
-  ShieldCheck, Info, CircleHelp,
+  ShieldCheck, Info, CircleHelp, Sun, Moon,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminStatus } from '../hooks/useAdminStatus';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
+import { useTheme } from '../contexts/ThemeContext';
 import Footer from '../components/Footer';
 import HelpModal from '../components/HelpModal';
 
@@ -54,6 +55,7 @@ function SidebarInner({ onClose }: { onClose?: () => void }) {
   const { user, profile, signOut, signInWithGoogle } = useAuth();
   const { isAdmin } = useAdminStatus();
   const { data: flags } = useFeatureFlags();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const avatarUrl   = profile?.avatar_url ?? user?.user_metadata?.avatar_url;
@@ -165,6 +167,13 @@ function SidebarInner({ onClose }: { onClose?: () => void }) {
               <Link to="/profile" onClick={onClose} className="hover:text-gray-300 transition-colors">
                 Profil
               </Link>
+              <button
+                onClick={toggleTheme}
+                title={theme === 'dark' ? 'Mode Terang' : 'Mode Gelap'}
+                className="hover:text-gray-300 transition-colors flex items-center gap-1"
+              >
+                {theme === 'dark' ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
+              </button>
               <button
                 onClick={() => { signOut(); onClose?.(); navigate('/'); }}
                 className="hover:text-red-400 transition-colors flex items-center gap-1"

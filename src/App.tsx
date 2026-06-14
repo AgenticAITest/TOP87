@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import MainLayout from './layouts/MainLayout';
 import AdminLayout from './layouts/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -37,6 +38,8 @@ import AdminPayments         from './pages/admin/AdminPayments';
 import AdminMerchandise      from './pages/admin/AdminMerchandise';
 import AdminOrders           from './pages/admin/AdminOrders';
 import AdminFinancialReport  from './pages/admin/AdminFinancialReport';
+import AdminBankRekon        from './pages/admin/AdminBankRekon';
+import AdminCharters         from './pages/admin/AdminCharters';
 import PaymentsPage     from './pages/PaymentsPage';
 import MerchandisePage  from './pages/MerchandisePage';
 import MyOrdersPage     from './pages/MyOrdersPage';
@@ -56,6 +59,7 @@ function RootRoute() {
 
 export default function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <Routes>
         {/* OAuth callback — no layout */}
@@ -104,6 +108,8 @@ export default function App() {
           <Route path="merchandise"     element={<AdminMerchandise />} />
           <Route path="orders"          element={<AdminOrders />} />
           <Route path="financial"       element={<AdminFinancialReport />} />
+          <Route path="bank-rekon"      element={<AdminBankRekon />} />
+          <Route path="charters"        element={<AdminCharters />} />
           <Route path="*"           element={<Navigate to="/admin" replace />} />
         </Route>
 
@@ -112,5 +118,6 @@ export default function App() {
         </Route>
       </Routes>
     </AuthProvider>
+    </ThemeProvider>
   );
 }

@@ -1,6 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
+/* Enable class-based dark mode for dark: utility variants */
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-serif: "Crimson Pro", serif;
   --font-sans: "Inter", sans-serif;
@@ -48,12 +51,20 @@
     background-image: url('https://www.transparenttextures.com/patterns/paper-fibers.png');
     background-attachment: fixed;
   }
+  .dark .parchment-bg {
+    background-color: #0f172a;
+    background-image: none;
+  }
 
   /* ── Cards ────────────────────────────────────────────── */
   .glass-card {
     background: rgba(248, 244, 236, 0.85);
     backdrop-filter: blur(4px);
     border: 1px solid rgba(212, 175, 55, 0.15);
+  }
+  .dark .glass-card {
+    background: rgba(15, 30, 55, 0.85);
+    border-color: rgba(212, 175, 55, 0.1);
   }
 
   /* Legacy aliases kept for admin panel pages */

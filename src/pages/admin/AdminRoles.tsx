@@ -1,19 +1,20 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShieldCheck, UserPlus, X, Loader, ChevronDown } from 'lucide-react';
+import { Search, ShieldCheck, UserPlus, X, Loader, ChevronDown, Landmark } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
-import { fetchCharters } from '../../lib/queries';
+import { fetchCharters, grantFinanceAdmin, revokeFinanceAdmin, qk } from '../../lib/queries';
 
 // ─── Fetchers ─────────────────────────────────────────────────────────────────
 
 async function fetchAdmins() {
-  const [{ data: sData }, { data: cData }] = await Promise.all([
+  const [{ data: sData }, { data: cData }, { data: fData }] = await Promise.all([
     supabase.from('profiles').select('id, name, avatar_url').eq('is_super_admin', true).order('name'),
     supabase.from('charter_admins').select('profile_id, charter_id, profiles(id, name, avatar_url), charters(id, name)'),
+    supabase.from('finance_admins').select('profile_id, profiles(id, name, avatar_url)'),
   ]);
   return {
     superAdmins: (sData ?? []).map((p: any) => ({
@@ -27,6 +28,11 @@ async function fetchAdmins() {
       name:         (r.profiles?.name   ?? null) as string | null,
       avatar_url:   (r.profiles?.avatar_url ?? null) as string | null,
       charter_name: (r.charters?.name   ?? null) as string | null,
+    })),
+    financeAdmins: (fData ?? []).map((r: any) => ({
+      profile_id: r.profile_id as string,
+      name:       (r.profiles?.name       ?? null) as string | null,
+      avatar_url: (r.profiles?.avatar_url ?? null) as string | null,
     })),
   };
 }
@@ -109,7 +115,25 @@ export default function AdminRoles() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'roles'] }),
   });
 
-  const busy = superMut.isPending || charterMut.isPending;
+  const financeMut = useMutation({
+    mutationFn: async ({ profileId, grant }: { profileId: string; grant: boolean }) => {
+      if (grant) {
+        await grantFinanceAdmin(profileId);
+      } else {
+        await revokeFinanceAdmin(profileId);
+      }
+      await supabase.from('audit_log').insert({
+        action: grant ? 'grant_finance_admin' : 'revoke_finance_admin',
+        actor_id: user!.id, target_id: profileId, details: {},
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'roles'] });
+      queryClient.invalidateQueries({ queryKey: qk.financeAdmins() });
+    },
+  });
+
+  const busy = superMut.isPending || charterMut.isPending || financeMut.isPending;
 
   // charter_id set per profile_id for quick lookups
   const charterAdminMap = useMemo(() => {
@@ -119,6 +143,10 @@ export default function AdminRoles() {
     });
     return map;
   }, [admins]);
+
+  const financeAdminSet = useMemo(() =>
+    new Set((admins?.financeAdmins ?? []).map(fa => fa.profile_id)),
+  [admins]);
 
   const filteredMembers = useMemo(() => {
     if (!search.trim()) return [];
@@ -169,6 +197,33 @@ export default function AdminRoles() {
                     </button>
                   )
                 }
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Finance Admins */}
+      <section className="mb-8">
+        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-gold/60 mb-3">Finance Admins</h2>
+        {adminsLoading ? (
+          <div className="glass rounded-xl p-5 text-center text-gray-600 text-sm animate-pulse">Loading…</div>
+        ) : (admins?.financeAdmins ?? []).length === 0 ? (
+          <div className="glass rounded-xl p-4 text-center text-gray-600 text-sm">None yet.</div>
+        ) : (
+          <div className="space-y-2">
+            {(admins?.financeAdmins ?? []).map(fa => (
+              <div key={fa.profile_id} className="glass flex items-center gap-3 px-4 py-3 rounded-xl">
+                <Avatar url={fa.avatar_url} name={fa.name} />
+                <span className="text-sm text-white flex-1 truncate">{fa.name ?? '—'}</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                  Finance Admin
+                </span>
+                <button onClick={() => financeMut.mutate({ profileId: fa.profile_id, grant: false })}
+                  disabled={busy} title="Revoke finance admin"
+                  className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all disabled:opacity-40">
+                  <X size={14} />
+                </button>
               </div>
             ))}
           </div>
@@ -276,6 +331,29 @@ export default function AdminRoles() {
                                   disabled={busy}
                                   className="flex items-center gap-1.5 text-xs font-bold text-gold border border-gold/30 px-3 py-1.5 rounded-full hover:bg-gold/10 transition-all disabled:opacity-40">
                                   {superMut.isPending ? <Loader size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Grant
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Finance Admin row */}
+                            <div className="flex items-center justify-between gap-4">
+                              <div>
+                                <p className="text-xs font-bold uppercase tracking-widest text-white">Finance Admin</p>
+                                <p className="text-[11px] text-gray-500 mt-0.5">Bank rekonsiliasi & laporan keuangan.</p>
+                              </div>
+                              {m.id === user!.id ? (
+                                <span className="text-[10px] text-gray-600 tracking-widest uppercase italic">That's you</span>
+                              ) : financeAdminSet.has(m.id) ? (
+                                <button onClick={() => financeMut.mutate({ profileId: m.id, grant: false })}
+                                  disabled={busy}
+                                  className="flex items-center gap-1.5 text-xs font-bold text-red-400 border border-red-500/30 px-3 py-1.5 rounded-full hover:bg-red-500/10 transition-all disabled:opacity-40">
+                                  {financeMut.isPending ? <Loader size={12} className="animate-spin" /> : <X size={12} />} Revoke
+                                </button>
+                              ) : (
+                                <button onClick={() => financeMut.mutate({ profileId: m.id, grant: true })}
+                                  disabled={busy}
+                                  className="flex items-center gap-1.5 text-xs font-bold text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-full hover:bg-amber-500/10 transition-all disabled:opacity-40">
+                                  {financeMut.isPending ? <Loader size={12} className="animate-spin" /> : <Landmark size={12} />} Grant
                                 </button>
                               )}
                             </div>

@@ -84,6 +84,7 @@ export default function AdminMembers() {
       queryClient.invalidateQueries({ queryKey: ['admin'] });
       queryClient.invalidateQueries({ queryKey: qk.members() });
     },
+    onError: (err: Error) => alert(`Delete failed: ${err.message}`),
   });
 
   const statusTabs: Status[] = ['all', 'pending', 'approved', 'suspended', 'rejected'];

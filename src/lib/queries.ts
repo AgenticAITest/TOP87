@@ -35,6 +35,14 @@ export const qk = {
   latestComment:    ()                                      => ['comments', 'latest']                         as const,
   // Generic site setting
   siteSetting:      (key: string)                           => ['site_settings', key]                         as const,
+  // Finance admin
+  financeAdmins:    ()                                      => ['admin', 'finance-admins']                    as const,
+  confirmedPayments:()                                      => ['admin', 'payments', 'confirmed']             as const,
+  // Phase 7.3 — charter management
+  adminCharters:    ()                                      => ['admin', 'charters']                          as const,
+  charterMembers:   (charterId: string)                     => ['admin', 'charters', charterId, 'members']   as const,
+  // Phase 7.4 — admin backdrop
+  adminBackdrop:    ()                                      => ['admin', 'backdrop']                          as const,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -341,7 +349,7 @@ export interface Payment {
   member_amount:         number;
   admin_adjusted_amount: number | null;
   receipt_url:           string | null;
-  status:                'submitted' | 'pending_review' | 'confirmed' | 'rejected';
+  status:                'submitted' | 'pending_review' | 'confirmed' | 'bank_reconciled' | 'rejected';
   member_notes:          string | null;
   admin_notes:           string | null;
   reviewed_by:           string | null;
@@ -459,6 +467,49 @@ export async function fetchPaymentTotals(): Promise<{ reunion_fee: number; donat
     else if (p.type === 'donation') totals.donation += amt;
   });
   return totals;
+}
+
+// ─── Finance Admin ────────────────────────────────────────────────────────────
+
+export interface FinanceAdmin {
+  profile_id: string;
+  name:       string | null;
+  avatar_url: string | null;
+}
+
+export async function fetchFinanceAdmins(): Promise<FinanceAdmin[]> {
+  const { data, error } = await supabase
+    .from('finance_admins')
+    .select('profile_id, profiles!finance_admins_profile_id_fkey(name, avatar_url)');
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    profile_id: r.profile_id as string,
+    name:       (r.profiles?.name       ?? null) as string | null,
+    avatar_url: (r.profiles?.avatar_url ?? null) as string | null,
+  }));
+}
+
+export async function grantFinanceAdmin(profileId: string): Promise<void> {
+  const { error } = await supabase.from('finance_admins').insert({ profile_id: profileId });
+  if (error) throw error;
+}
+
+export async function revokeFinanceAdmin(profileId: string): Promise<void> {
+  const { error } = await supabase.from('finance_admins').delete().eq('profile_id', profileId);
+  if (error) throw error;
+}
+
+export async function fetchConfirmedPayments(): Promise<Payment[]> {
+  const { data, error } = await supabase
+    .from('payments')
+    .select('*, profiles!payments_profile_id_fkey(name, avatar_url)')
+    .in('status', ['confirmed', 'bank_reconciled'])
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    ...r,
+    profile: r.profiles ?? null,
+  })) as Payment[];
 }
 
 // ─── Site Content (About + Yearbook) ─────────────────────────────────────────
@@ -749,6 +800,137 @@ export async function fetchLatestComment(): Promise<{ body: string; profileName:
     .maybeSingle();
   if (!data) return null;
   return { body: (data as any).body, profileName: (data as any).profile?.name ?? 'Alumni' };
+}
+
+// ─── Phase 7.3 — Charter Management ─────────────────────────────────────────
+
+export interface AdminCharter {
+  id:              string;
+  slug:            string;
+  name:            string;
+  city:            string;
+  country:         string;
+  description:     string | null;
+  hero_image_url:  string | null;
+  announcement:    string | null;
+  is_active:       boolean;
+  memberCount:     number;
+}
+
+export async function fetchAdminCharters(): Promise<AdminCharter[]> {
+  const [{ data: charterData, error }, { data: memberData }] = await Promise.all([
+    supabase
+      .from('charters')
+      .select('id, slug, name, city, country, description, hero_image_url, announcement, is_active')
+      .order('name'),
+    supabase.from('charter_members').select('charter_id'),
+  ]);
+  must(charterData, error);
+  const counts: Record<string, number> = {};
+  (memberData ?? []).forEach((cm: any) => {
+    counts[cm.charter_id] = (counts[cm.charter_id] ?? 0) + 1;
+  });
+  return (charterData ?? []).map((c: any) => ({ ...c, memberCount: counts[c.id] ?? 0 }));
+}
+
+export async function createCharter(charter: {
+  name:    string;
+  slug:    string;
+  city:    string;
+  country: string;
+}): Promise<{ id: string }> {
+  const { data, error } = await supabase
+    .from('charters')
+    .insert({ ...charter, is_active: true })
+    .select('id')
+    .single();
+  must(data, error);
+  return data as { id: string };
+}
+
+export async function updateCharter(
+  id: string,
+  patch: { name?: string; slug?: string; city?: string; country?: string; is_active?: boolean }
+): Promise<void> {
+  const { error } = await supabase.from('charters').update(patch).eq('id', id);
+  if (error) throw error;
+}
+
+export interface CharterMember {
+  profile_id: string;
+  is_primary:  boolean;
+  profile:     { name: string | null; avatar_url: string | null; city: string | null; profession: string | null };
+}
+
+export async function fetchCharterMembers(charterId: string): Promise<CharterMember[]> {
+  const { data: links, error } = await supabase
+    .from('charter_members')
+    .select('profile_id, is_primary')
+    .eq('charter_id', charterId);
+  must(links, error);
+  if (!links || links.length === 0) return [];
+
+  const profileIds = links.map((l: any) => l.profile_id as string);
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, name, avatar_url, city, profession')
+    .in('id', profileIds);
+
+  const profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.id, p]));
+  return links.map((l: any) => ({
+    profile_id: l.profile_id,
+    is_primary:  l.is_primary,
+    profile:     profileMap[l.profile_id] ?? { name: null, avatar_url: null, city: null, profession: null },
+  }));
+}
+
+export async function addMemberToCharter(charterId: string, profileId: string): Promise<void> {
+  const { error } = await supabase
+    .from('charter_members')
+    .insert({ charter_id: charterId, profile_id: profileId, is_primary: false });
+  if (error) throw error;
+}
+
+export async function removeMemberFromCharter(charterId: string, profileId: string): Promise<void> {
+  const { error } = await supabase
+    .from('charter_members')
+    .delete()
+    .eq('charter_id', charterId)
+    .eq('profile_id', profileId);
+  if (error) throw error;
+}
+
+export async function setPrimaryCharter(charterId: string, profileId: string, isPrimary: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('charter_members')
+    .update({ is_primary: isPrimary })
+    .eq('charter_id', charterId)
+    .eq('profile_id', profileId);
+  if (error) throw error;
+}
+
+// ─── Phase 7.4 — Admin Backdrop ───────────────────────────────────────────────
+
+export interface AdminBackdrop { url: string; opacity: number; }
+
+export async function fetchAdminBackdrop(): Promise<AdminBackdrop> {
+  const { data } = await supabase
+    .from('site_settings')
+    .select('key, value')
+    .in('key', ['admin_backdrop_url', 'admin_backdrop_opacity']);
+  const m = Object.fromEntries((data ?? []).map((r: any) => [r.key, r.value as string]));
+  return {
+    url:     m['admin_backdrop_url']     ?? '',
+    opacity: parseInt(m['admin_backdrop_opacity'] ?? '15', 10),
+  };
+}
+
+export async function setAdminBackdrop(b: AdminBackdrop): Promise<void> {
+  const { error } = await supabase.from('site_settings').upsert([
+    { key: 'admin_backdrop_url',     value: b.url },
+    { key: 'admin_backdrop_opacity', value: String(b.opacity) },
+  ], { onConflict: 'key' });
+  if (error) throw error;
 }
 
 export async function fetchBudgetTarget(): Promise<number> {

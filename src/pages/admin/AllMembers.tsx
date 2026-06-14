@@ -133,6 +133,7 @@ export default function AllMembers() {
       queryClient.invalidateQueries({ queryKey: ['admin'] });
       queryClient.invalidateQueries({ queryKey: qk.members() });
     },
+    onError: (err: Error) => alert(`Delete failed: ${err.message}`),
   });
 
   return (

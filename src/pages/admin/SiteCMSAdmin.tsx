@@ -1,7 +1,9 @@
-import { useState, useEffect, Fragment } from 'react';
-import { Check, Loader, RotateCcw, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useRef, Fragment, type ChangeEvent } from 'react';
+import { Check, Loader, RotateCcw, AlertCircle, Upload } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchPageContent, upsertField, type ContentType } from '../../lib/cms';
+import { useAuth } from '../../contexts/AuthContext';
+import { uploadFile, resolveMediaUrl } from '../../lib/storage';
 
 // ─── Page / field schema ──────────────────────────────────────────────────────
 
@@ -10,6 +12,7 @@ interface FieldDef {
   type: ContentType;
   hint?: string;
   rows?: number;
+  template?: string;
 }
 interface SectionDef {
   label: string;
@@ -19,6 +22,20 @@ interface PageDef {
   label: string;
   sections: Record<string, SectionDef>;
 }
+
+const FAQ_TEMPLATE = JSON.stringify([
+  { q: 'Kapan dan di mana acara reuni berlangsung?', a: 'Reuni berlangsung pada 10–22 Mei 2027 di kawasan Bandung / Ciwidey. Detail lokasi akan diinformasikan lebih lanjut.' },
+  { q: 'Berapa biaya iuran reuni?', a: 'Biaya iuran reuni adalah Rp 2.017.000 per orang. Pembayaran dapat dilakukan secara cicilan.' },
+  { q: 'Bagaimana cara mendaftar?', a: "Klik tombol 'Daftar Sekarang' di halaman utama, masuk dengan akun Google, lalu lengkapi profil Anda. Setelah diverifikasi panitia, Anda akan mendapat akses penuh." },
+  { q: 'Apakah pendaftaran bisa dibatalkan?', a: 'Silakan hubungi panitia untuk informasi pembatalan. Kebijakan refund akan diinformasikan lebih lanjut.' },
+  { q: 'Bagaimana jika saya tidak bisa hadir secara fisik?', a: 'Anda tetap bisa mendaftar dan bergabung di portal alumni untuk tetap terhubung dengan teman angkatan.' },
+], null, 2);
+
+const PENGUMUMAN_TEMPLATE = JSON.stringify([
+  { title: 'Portal Pendaftaran Resmi Dibuka!', body: 'Kami dengan bangga mengumumkan pembukaan portal pendaftaran reuni TOP87. Segera daftarkan diri Anda dan ajak teman-teman angkatan!', date: '2026-06-14', highlight: true },
+  { title: 'Dresscode: Putih untuk Hari Pertama', body: 'Ayo seragamkan penampilan kita! Dresscode hari pertama reuni adalah kemeja/baju putih formal agar dokumentasi terlihat kompak dan berkesan.', date: '2026-06-14', highlight: false },
+  { title: 'Info Cicilan Iuran', body: 'Iuran reuni sebesar Rp 2.017.000 dapat dibayarkan secara cicilan. Jadwal dan mekanisme pembayaran akan segera diinformasikan.', date: '2026-06-14', highlight: false },
+], null, 2);
 
 const PAGES: Record<string, PageDef> = {
   landing: {
@@ -30,20 +47,16 @@ const PAGES: Record<string, PageDef> = {
           image_url: { label: 'Background image URL', type: 'image_url', hint: 'Direct image URL for the hero banner background.' },
           title:     { label: 'Headline',             type: 'text',      hint: 'Main hero headline. Default: "Sekarang Aku Menjadi Dewasa"' },
           subtitle:  { label: 'Sub-tagline',          type: 'text',      hint: 'Italic quote shown below the headline.' },
+          date:      { label: 'Event date display',   type: 'text',      hint: 'Date range shown in the hero, e.g. "10 – 22 Mei 2027"' },
+          venue:     { label: 'Venue line',            type: 'text',      hint: 'Shown in the hero banner, e.g. "Bandung / Ciwidey"' },
           cta_label: { label: 'CTA button label',     type: 'text',      hint: 'Default: "Daftar Sekarang"' },
         },
       },
       reunion: {
         label: 'Reunion Info',
         fields: {
-          date_iso: { label: 'Reunion date (ISO 8601)', type: 'text', hint: 'e.g. 2027-04-29T17:00:00+07:00 — drives the countdown clock.' },
-          venue:    { label: 'Venue line',              type: 'text', hint: 'Shown in the hero banner, e.g. "Bandung / Ciwidey"' },
-        },
-      },
-      kpi: {
-        label: 'KPI',
-        fields: {
-          quota: { label: 'Target attendees (quota)', type: 'text', hint: 'Integer, e.g. 122. Used for the progress bar.' },
+          date_iso:     { label: 'Reunion start date (ISO 8601)', type: 'text', hint: 'e.g. 2027-05-10T08:00:00+07:00 — drives the countdown clock.' },
+          quota_target: { label: 'Target attendees (quota)',      type: 'text', hint: 'Integer, e.g. 122. Used for the Kehadiran Alumni progress bar.' },
         },
       },
     },
@@ -81,6 +94,7 @@ const PAGES: Record<string, PageDef> = {
             type: 'json',
             rows: 10,
             hint: 'Array of {q: "question text", a: "answer text"}.',
+            template: FAQ_TEMPLATE,
           },
         },
       },
@@ -97,6 +111,7 @@ const PAGES: Record<string, PageDef> = {
             type: 'json',
             rows: 10,
             hint: 'Array of {title, body, date, highlight: true|false}.',
+            template: PENGUMUMAN_TEMPLATE,
           },
         },
       },
@@ -124,8 +139,13 @@ function FieldEditor({
   pageKey: string; sectionKey: string; fieldKey: string;
   def: FieldDef; initialValue: string; onSaved: () => void;
 }) {
-  const [value, setValue]   = useState(initialValue);
-  const [saved, setSaved]   = useState(false);
+  const { user } = useAuth();
+  const fileRef  = useRef<HTMLInputElement>(null);
+
+  const [value, setValue]     = useState(initialValue);
+  const [saved, setSaved]     = useState(false);
+  const [uploading, setUploading]   = useState(false);
+  const [uploadErr, setUploadErr]   = useState<string | null>(null);
 
   useEffect(() => { setValue(initialValue); }, [initialValue]);
 
@@ -142,6 +162,22 @@ function FieldEditor({
       setTimeout(() => setSaved(false), 2000);
     },
   });
+
+  async function handleFileUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setUploading(true);
+    setUploadErr(null);
+    try {
+      const path = await uploadFile(file, user.id, () => {});
+      setValue(resolveMediaUrl(path) ?? path);
+    } catch (err) {
+      setUploadErr((err as Error).message);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
 
   return (
     <div className="space-y-2">
@@ -165,12 +201,25 @@ function FieldEditor({
 
       {def.type === 'image_url' ? (
         <div className="space-y-2">
-          <input
-            value={value}
-            onChange={e => setValue(e.target.value)}
-            placeholder="https://example.com/image.jpg"
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
-          />
+          <div className="flex gap-2">
+            <input
+              value={value}
+              onChange={e => setValue(e.target.value)}
+              placeholder="https://example.com/image.jpg"
+              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 text-gray-400 hover:text-white hover:border-white/20 bg-white/[0.02] transition-all disabled:opacity-50 text-sm shrink-0"
+            >
+              {uploading ? <Loader size={14} className="animate-spin" /> : <Upload size={14} />}
+              {uploading ? 'Uploading…' : 'Upload'}
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+          </div>
+          {uploadErr && <p className="text-red-400 text-xs">{uploadErr}</p>}
           {value.trim() && (
             <div className="rounded-xl overflow-hidden h-28 bg-white/5">
               <img src={value.trim()} alt="Preview" className="w-full h-full object-cover opacity-60"
@@ -179,15 +228,26 @@ function FieldEditor({
           )}
         </div>
       ) : (def.rows ?? 1) > 1 ? (
-        <textarea
-          value={def.type === 'json' && !isDirty ? tryFormatJson(value) : value}
-          onChange={e => setValue(e.target.value)}
-          rows={def.rows ?? 4}
-          className={`w-full bg-white/5 border rounded-xl px-4 py-2.5 text-white text-sm font-mono focus:outline-none transition-colors resize-y ${
-            jsonErr ? 'border-red-500/50 focus:border-red-400' : 'border-white/10 focus:border-gold/50'
-          }`}
-          placeholder={def.type === 'json' ? '[\n  { … }\n]' : ''}
-        />
+        <div className="space-y-1.5">
+          {isJson && def.template && (
+            <button
+              type="button"
+              onClick={() => setValue(tryFormatJson(def.template!))}
+              className="text-[10px] text-gold/60 hover:text-gold transition-colors"
+            >
+              {value.trim() ? '↺ Reset ke template' : '↓ Muat template'}
+            </button>
+          )}
+          <textarea
+            value={def.type === 'json' && !isDirty ? tryFormatJson(value) : value}
+            onChange={e => setValue(e.target.value)}
+            rows={def.rows ?? 4}
+            className={`w-full bg-white/5 border rounded-xl px-4 py-2.5 text-white text-sm font-mono focus:outline-none transition-colors resize-y ${
+              jsonErr ? 'border-red-500/50 focus:border-red-400' : 'border-white/10 focus:border-gold/50'
+            }`}
+            placeholder={def.type === 'json' ? '[\n  { … }\n]' : ''}
+          />
+        </div>
       ) : (
         <input
           value={value}

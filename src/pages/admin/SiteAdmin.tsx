@@ -1,14 +1,16 @@
-import { useState, useMemo, ReactNode } from 'react';
+import { useState, useMemo, useRef, type ChangeEvent, ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { Check, Loader, HardDrive, Cloud, Shuffle, List, Search, X, Users, ToggleLeft, ToggleRight, QrCode, FileText } from 'lucide-react';
+import { Check, Loader, HardDrive, Cloud, Shuffle, List, Search, X, Users, ToggleLeft, ToggleRight, QrCode, FileText, Monitor, Upload } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
-import { getStorageBackend, setStorageBackend, type StorageBackend } from '../../lib/storage';
+import { getStorageBackend, setStorageBackend, uploadFile, resolveMediaUrl, type StorageBackend } from '../../lib/storage';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   getFeaturedConfig, setFeaturedConfig,
   fetchApprovedMembers,
   fetchQRISConfig, setQRISConfig,
   fetchSiteSetting, setSiteSetting,
+  fetchAdminBackdrop, setAdminBackdrop,
   type FeaturedMode, type FeaturedConfig, type QRISConfig,
   qk,
 } from '../../lib/queries';
@@ -77,6 +79,7 @@ type ApprovedMember = Awaited<ReturnType<typeof fetchApprovedMembers>>[number];
 
 export default function SiteAdmin() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   // ── Feature flags state ──
   const [flagsSaved, setFlagsSaved] = useState(false);
@@ -205,6 +208,63 @@ export default function SiteAdmin() {
       setTimeout(() => setFlyerSaved(false), 2000);
     },
   });
+
+  // ── Admin backdrop state ──
+  const [backdropSaved, setBackdropSaved]   = useState(false);
+  const [localBackdropUrl,     setLocalBackdropUrl]     = useState<string | null>(null);
+  const [localBackdropOpacity, setLocalBackdropOpacity] = useState<number | null>(null);
+
+  const { data: currentBackdrop } = useQuery({
+    queryKey: qk.adminBackdrop(),
+    queryFn:  fetchAdminBackdrop,
+  });
+
+  const activeBackdropUrl     = localBackdropUrl     ?? currentBackdrop?.url     ?? '';
+  const activeBackdropOpacity = localBackdropOpacity ?? currentBackdrop?.opacity ?? 15;
+
+  const backdropDirty =
+    (localBackdropUrl     !== null && localBackdropUrl     !== (currentBackdrop?.url     ?? '')) ||
+    (localBackdropOpacity !== null && localBackdropOpacity !== (currentBackdrop?.opacity ?? 15));
+
+  const backdropMutation = useMutation({
+    mutationFn: () => setAdminBackdrop({ url: activeBackdropUrl, opacity: activeBackdropOpacity }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.adminBackdrop() });
+      setLocalBackdropUrl(null);
+      setLocalBackdropOpacity(null);
+      setBackdropSaved(true);
+      setTimeout(() => setBackdropSaved(false), 2000);
+    },
+  });
+
+  function resetBackdrop() {
+    setLocalBackdropUrl('');
+    setLocalBackdropOpacity(15);
+  }
+
+  // ── Backdrop file upload ──
+  const backdropFileRef = useRef<HTMLInputElement>(null);
+  const [backdropUploading, setBackdropUploading] = useState(false);
+  const [backdropUploadProgress, setBackdropUploadProgress] = useState(0);
+  const [backdropUploadError, setBackdropUploadError] = useState<string | null>(null);
+
+  async function handleBackdropFileUpload(e: ChangeEvent<HTMLInputElement>): Promise<void> {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setBackdropUploading(true);
+    setBackdropUploadProgress(0);
+    setBackdropUploadError(null);
+    try {
+      const path = await uploadFile(file, user.id, pct => setBackdropUploadProgress(pct));
+      const url  = resolveMediaUrl(path) ?? path;
+      setLocalBackdropUrl(url);
+    } catch (err) {
+      setBackdropUploadError((err as Error).message);
+    } finally {
+      setBackdropUploading(false);
+      if (backdropFileRef.current) backdropFileRef.current.value = '';
+    }
+  }
 
   // Member search helpers
   const searchResults = useMemo(() => {
@@ -628,6 +688,119 @@ export default function SiteAdmin() {
           </div>
           {flyerMutation.isError && (
             <p className="text-red-400 text-xs mt-3">{(flyerMutation.error as Error).message}</p>
+          )}
+        </section>
+
+        {/* ── Admin Backdrop ── */}
+        <section className="glass rounded-2xl p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Monitor size={16} className="text-gold/60" />
+            <h2 className="text-white font-bold text-lg">Admin Panel Backdrop</h2>
+          </div>
+          <p className="text-gray-500 text-sm mb-6">
+            Custom background image for the admin content area. Leave blank to use the default solid dark background.
+          </p>
+
+          <div className="space-y-5 mb-6">
+            {/* URL input + upload */}
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1">Image</label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={activeBackdropUrl}
+                  onChange={e => setLocalBackdropUrl(e.target.value)}
+                  placeholder="https://… (paste URL or upload)"
+                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => backdropFileRef.current?.click()}
+                  disabled={backdropUploading}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 text-gray-400 hover:text-white hover:border-white/20 bg-white/[0.02] transition-all disabled:opacity-50 text-sm shrink-0"
+                >
+                  {backdropUploading
+                    ? <><Loader size={14} className="animate-spin" /> {backdropUploadProgress}%</>
+                    : <><Upload size={14} /> Upload</>
+                  }
+                </button>
+                <input
+                  ref={backdropFileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleBackdropFileUpload}
+                />
+              </div>
+              {backdropUploadError && (
+                <p className="text-red-400 text-xs mt-1">{backdropUploadError}</p>
+              )}
+            </div>
+
+            {/* Opacity slider */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs uppercase tracking-widest text-gray-500">Overlay Darkness</label>
+                <span className="text-sm font-bold text-white">{activeBackdropOpacity}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={activeBackdropOpacity}
+                onChange={e => setLocalBackdropOpacity(parseInt(e.target.value, 10))}
+                className="w-full accent-gold h-1.5 rounded-full"
+              />
+              <div className="flex justify-between text-[10px] text-gray-600 mt-1">
+                <span>0% — image only</span>
+                <span>100% — fully black</span>
+              </div>
+            </div>
+
+            {/* Live preview */}
+            {activeBackdropUrl && (
+              <div>
+                <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Preview</label>
+                <div className="relative w-full h-24 rounded-xl overflow-hidden border border-white/10">
+                  <div
+                    className="absolute inset-0 bg-cover bg-center"
+                    style={{ backgroundImage: `url(${activeBackdropUrl})` }}
+                  />
+                  <div
+                    className="absolute inset-0"
+                    style={{ backgroundColor: `rgba(10,10,10,${activeBackdropOpacity / 100})` }}
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <p className="text-white text-xs font-bold uppercase tracking-widest drop-shadow">Admin Content</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => backdropMutation.mutate()}
+              disabled={backdropMutation.isPending || !backdropDirty}
+              className="flex items-center gap-2 bg-gold hover:bg-gold/90 text-charcoal font-bold py-2.5 px-6 rounded-full transition-all disabled:opacity-40 uppercase tracking-widest text-xs"
+            >
+              {backdropMutation.isPending
+                ? <><Loader size={14} className="animate-spin" /> Saving…</>
+                : backdropSaved
+                  ? <><Check size={14} /> Saved</>
+                  : 'Save'}
+            </button>
+            {(activeBackdropUrl || activeBackdropOpacity !== 15) && (
+              <button
+                onClick={resetBackdrop}
+                className="text-xs text-gray-500 hover:text-red-400 transition-colors"
+              >
+                Reset to default
+              </button>
+            )}
+          </div>
+          {backdropMutation.isError && (
+            <p className="text-red-400 text-xs mt-3">{(backdropMutation.error as Error).message}</p>
           )}
         </section>
 
