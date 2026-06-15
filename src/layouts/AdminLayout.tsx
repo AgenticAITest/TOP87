@@ -2,32 +2,32 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAdminBackdrop, qk } from '../lib/queries';
 import { Outlet, NavLink, Link, Navigate } from 'react-router-dom';
-import { Users, Image, LayoutDashboard, FileText, Globe, ChevronRight, ChevronLeft, LogOut, BookOpen, ShieldCheck, PenSquare, CreditCard, ShoppingBag, Package, BarChart3, CircleHelp, Sun, Moon, Landmark, Building2, HeartHandshake } from 'lucide-react';
+import { Users, Image, LayoutDashboard, FileText, Globe, ChevronRight, ChevronLeft, ChevronDown, LogOut, BookOpen, ShieldCheck, PenSquare, CreditCard, ShoppingBag, Package, BarChart3, CircleHelp, Sun, Moon, Landmark, Building2, HeartHandshake } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminStatus } from '../hooks/useAdminStatus';
 import { useTheme } from '../contexts/ThemeContext';
 import HelpModal from '../components/HelpModal';
 
 const adminLinks = [
-  { to: '/admin',            label: 'Dashboard',   icon: LayoutDashboard, end: true  },
-  { to: '/admin/members',    label: 'Members',      icon: Users,           end: false },
-  { to: '/admin/media',      label: 'Media Queue',  icon: Image,           end: false },
-  { to: '/admin/cms',        label: 'Charter CMS',  icon: FileText,        end: false },
-  { to: '/admin/payments',     label: 'Pembayaran',   icon: CreditCard,   end: false },
-  { to: '/admin/merchandise',  label: 'Merchandise',  icon: ShoppingBag,  end: false },
-  { to: '/admin/orders',       label: 'Pesanan',      icon: Package,      end: false },
+  { to: '/admin',         label: 'Dashboard',  icon: LayoutDashboard, end: true  },
+  { to: '/admin/members', label: 'Members',    icon: Users,           end: false },
+  { to: '/admin/cms',     label: 'Charter CMS',icon: FileText,        end: false },
 ];
 
 const superAdminLinks = [
-  { to: '/admin/site',        label: 'Site Settings',  icon: Globe,       end: false },
-  { to: '/admin/site-cms',    label: 'Site CMS',       icon: PenSquare,   end: false },
-  { to: '/admin/content',     label: 'Content',        icon: BookOpen,    end: false },
-  { to: '/admin/all-members', label: 'All Members',    icon: Users,       end: false },
-  { to: '/admin/roles',       label: 'Admin Roles',    icon: ShieldCheck, end: false },
-  { to: '/admin/charters',    label: 'Charters',       icon: Building2,   end: false },
-  { to: '/admin/bank-rekon',  label: 'Bank Rekon',    icon: Landmark,        end: false },
-  { to: '/admin/financial',   label: 'Lap. Keuangan', icon: BarChart3,       end: false },
-  { to: '/admin/keringanan',  label: 'Keringanan',    icon: HeartHandshake,  end: false },
+  { to: '/admin/site',        label: 'Site Settings',  icon: Globe,         end: false },
+  { to: '/admin/site-cms',    label: 'Site CMS',       icon: PenSquare,     end: false },
+  { to: '/admin/content',     label: 'Content',        icon: BookOpen,      end: false },
+  { to: '/admin/all-members', label: 'All Members',    icon: Users,         end: false },
+  { to: '/admin/roles',       label: 'Admin Roles',    icon: ShieldCheck,   end: false },
+  { to: '/admin/charters',    label: 'Charters',       icon: Building2,     end: false },
+  { to: '/admin/media',       label: 'Media Queue',    icon: Image,         end: false },
+  { to: '/admin/payments',    label: 'Pembayaran',     icon: CreditCard,    end: false },
+  { to: '/admin/merchandise', label: 'Merchandise',    icon: ShoppingBag,   end: false },
+  { to: '/admin/orders',      label: 'Pesanan',        icon: Package,       end: false },
+  { to: '/admin/bank-rekon',  label: 'Bank Rekon',     icon: Landmark,      end: false },
+  { to: '/admin/financial',   label: 'Lap. Keuangan',  icon: BarChart3,     end: false },
+  { to: '/admin/keringanan',  label: 'Keringanan',     icon: HeartHandshake,end: false },
 ];
 
 const financeOnlyLinks = [
@@ -39,8 +39,10 @@ export default function AdminLayout() {
   const { user, profile, signOut } = useAuth();
   const { isAdmin, isSuperAdmin, isFinanceAdmin, loading } = useAdminStatus();
   const { theme, toggleTheme } = useTheme();
-  const [helpOpen,   setHelpOpen]   = useState(false);
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('admin-sidebar-collapsed') === 'true');
+  const [helpOpen,        setHelpOpen]        = useState(false);
+  const [collapsed,       setCollapsed]       = useState(() => localStorage.getItem('admin-sidebar-collapsed') === 'true');
+  const [charterExpanded, setCharterExpanded] = useState(() => localStorage.getItem('admin-charter-expanded') !== 'false');
+  const [superExpanded,   setSuperExpanded]   = useState(() => localStorage.getItem('admin-super-expanded') !== 'false');
 
   function toggle() {
     setCollapsed(v => {
@@ -123,14 +125,34 @@ export default function AdminLayout() {
             </>
           ) : (
             <>
-              {!collapsed && <p className="px-3 mb-2 text-[10px] uppercase tracking-widest text-gray-600">Charter Admin</p>}
-              {renderLinks(adminLinks)}
+              {/* Charter Admin section */}
+              {!collapsed ? (
+                <button
+                  onClick={() => { setCharterExpanded(v => { const n = !v; localStorage.setItem('admin-charter-expanded', String(n)); return n; }); }}
+                  className="w-full flex items-center justify-between px-3 mb-2 group"
+                >
+                  <span className="text-[10px] uppercase tracking-widest text-gray-600 group-hover:text-gray-400 transition-colors">Charter Admin</span>
+                  <ChevronDown size={10} className={`text-gray-600 transition-transform duration-150 ${charterExpanded ? '' : '-rotate-90'}`} />
+                </button>
+              ) : (
+                <div className="my-1 border-t border-white/5" />
+              )}
+              {charterExpanded && renderLinks(adminLinks)}
 
               {isSuperAdmin && (
                 <>
-                  {!collapsed && <p className="px-3 mt-5 mb-2 text-[10px] uppercase tracking-widest text-gray-600">Super Admin</p>}
-                  {collapsed && <div className="my-2 border-t border-white/5" />}
-                  {renderLinks(superAdminLinks)}
+                  {!collapsed ? (
+                    <button
+                      onClick={() => { setSuperExpanded(v => { const n = !v; localStorage.setItem('admin-super-expanded', String(n)); return n; }); }}
+                      className="w-full flex items-center justify-between px-3 mt-5 mb-2 group"
+                    >
+                      <span className="text-[10px] uppercase tracking-widest text-gray-600 group-hover:text-gray-400 transition-colors">Super Admin</span>
+                      <ChevronDown size={10} className={`text-gray-600 transition-transform duration-150 ${superExpanded ? '' : '-rotate-90'}`} />
+                    </button>
+                  ) : (
+                    <div className="my-2 border-t border-white/5" />
+                  )}
+                  {superExpanded && renderLinks(superAdminLinks)}
                 </>
               )}
             </>
