@@ -30,7 +30,7 @@ Klik **Simpan Profil** setelah semua data terisi.
 
 ### Status Akun
 
-Setelah mendaftar, akun Anda berstatus **Menunggu Persetujuan**. Admin charter akan memverifikasi data Anda. Anda akan mendapatkan akses penuh setelah disetujui.
+Setelah mendaftar, akun Anda berstatus **Menunggu Persetujuan**. Admin akan memverifikasi data Anda. Anda akan mendapatkan akses penuh setelah disetujui.
 
 | Status | Artinya |
 |---|---|
@@ -44,11 +44,13 @@ Setelah mendaftar, akun Anda berstatus **Menunggu Persetujuan**. Admin charter a
 
 Halaman utama setelah login menampilkan ringkasan:
 
-- **Jumlah anggota** yang telah bergabung
+- **Kehadiran Alumni** — jumlah yang sudah konfirmasi hadir dari total kuota
 - **Anggota terbaru** yang mendaftar
 - **Dana terkumpul** — iuran, donasi, dan margin merchandise
-- **Statistik kehadiran** reuni
+- **Statistik kehadiran** reuni (hadir / berencana / belum tahu / tidak bisa)
 - **Galeri foto** terbaru
+- **Pengumuman** terbaru dari panitia
+- **Rincian Anggaran** reuni secara transparan
 
 ---
 
@@ -85,13 +87,31 @@ Halaman **Gallery** berisi kenangan foto alumni.
 
 ---
 
+## Pengumuman
+
+Halaman **Pengumuman** berisi informasi terkini dari panitia reuni TOP87.
+
+- Update jadwal, dresscode, pembayaran, dan informasi penting lainnya.
+- Item yang disorot (highlight) ditampilkan di bagian atas.
+
+---
+
+## Anggaran
+
+Halaman **Anggaran** menampilkan rincian biaya reuni secara transparan.
+
+- Lihat breakdown biaya per kategori.
+- Termasuk biaya per orang dan total keseluruhan.
+
+---
+
 ## Iuran Reuni
 
 Iuran reuni adalah kontribusi wajib setiap anggota untuk mendanai acara reuni.
 
 ### Cara Membayar Iuran
 
-1. Buka halaman **Donasi** (ikon hati di sidebar).
+1. Buka halaman **Pembayaran** di sidebar.
 2. Pilih tab **Iuran Reuni**.
 3. Transfer ke rekening/QRIS yang tertera.
 4. Kembali ke portal, masukkan **jumlah yang ditransfer**.
@@ -115,6 +135,19 @@ Iuran reuni adalah kontribusi wajib setiap anggota untuk mendanai acara reuni.
 Donasi bersifat sukarela untuk mendukung kelancaran acara reuni.
 
 Langkah-langkah sama seperti pembayaran iuran, namun pilih tab **Donasi** pada halaman pembayaran. Tidak ada nominal minimum.
+
+---
+
+## Keringanan Biaya
+
+Jika Anda mengalami kesulitan membayar iuran penuh, Anda dapat mengajukan **keringanan biaya**.
+
+1. Buka halaman **Pembayaran**.
+2. Klik tombol **Ajukan Keringanan**.
+3. Isi formulir dengan alasan dan nominal yang bisa Anda bayarkan.
+4. Pengajuan akan ditinjau oleh Super Admin.
+
+> Pengajuan keringanan bersifat rahasia dan hanya dilihat oleh Super Admin.
 
 ---
 
@@ -143,15 +176,6 @@ Tersedia merchandise resmi reuni TOP87 seperti kaos, pin, dan suvenir lainnya.
 
 ---
 
-## Pesanan Saya
-
-Pantau semua pesanan merchandise Anda di halaman **My Orders**.
-
-- Lihat status terkini setiap pesanan.
-- Cek detail item, jumlah, dan harga.
-
----
-
 ## Profil Saya
 
 Perbarui informasi profil kapan saja di halaman **Profil**.
@@ -172,3 +196,6 @@ Perbarui informasi profil kapan saja di halaman **Profil**.
 
 **Saya ingin bergabung dengan charter kota lain.**
 → Hubungi super admin TOP87.
+
+**Saya kesulitan membayar iuran penuh.**
+→ Ajukan keringanan biaya melalui halaman Pembayaran.
