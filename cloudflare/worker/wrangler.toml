@@ -9,7 +9,6 @@ bucket_name = "top87bucket"
 
 [vars]
 SUPABASE_URL = "https://mksmeuswpqkafenikrdg.supabase.co"
-SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rc21ldXN3cHFrYWZlbmlrcmRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1Njc3MzIsImV4cCI6MjA5NDE0MzczMn0.WHosFlgR3pPLAyoUBjUlptwXlAUro1jAVbJimRwFhAQ"
 
 [[routes]]
 pattern = "media.top87.id/*"
