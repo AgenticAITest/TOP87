@@ -135,8 +135,8 @@ export default function PublicLanding() {
                 ))}
               </div>
               <span className="text-white/90 text-sm">
-                <strong>{approvedCount}</strong> alumni sudah bergabung
-                {remaining > 0 && <> · <span className="text-gold">Tinggal {remaining} kursi</span></>}
+                <strong>{approvedCount}</strong> alumni sudah tergabung
+                {remaining > 0 && <> - <span className="text-gold">Tinggal {remaining} slot menuju kuota minimum Booking Exclusive Seluruh Area Resort</span></>}
               </span>
             </div>
           )}
