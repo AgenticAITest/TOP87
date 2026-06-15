@@ -169,9 +169,15 @@ export default function Landing() {
           <h1 className="text-4xl font-bold mb-2">{heroTitle}</h1>
           <p className="italic text-sm text-gray-200 mb-6 font-light">{heroSub}</p>
           <div className="flex flex-wrap gap-4">
-            <Link to="/register" className="btn-primary px-8 py-2.5 rounded text-sm font-bold shadow-lg">
-              {heroCta}
-            </Link>
+            {isApproved ? (
+              <Link to="/profile" className="flex items-center gap-2 bg-green-600/80 hover:bg-green-600 backdrop-blur-sm px-8 py-2.5 rounded text-sm font-bold shadow-lg text-white transition-colors">
+                ✓ Sudah Terdaftar
+              </Link>
+            ) : (
+              <Link to="/register" className="btn-primary px-8 py-2.5 rounded text-sm font-bold shadow-lg">
+                {heroCta}
+              </Link>
+            )}
             {flags?.merchandise && (
               <Link
                 to="/merchandise"
@@ -259,13 +265,22 @@ export default function Landing() {
             </div>
           )}
 
-          <Link
-            to="/register"
-            className="btn-primary w-full py-2 rounded text-sm font-bold flex items-center justify-center gap-2"
-          >
-            <ArrowRight className="w-4 h-4" />
-            Daftar Sekarang
-          </Link>
+          {isApproved ? (
+            <Link
+              to="/profile"
+              className="w-full py-2 rounded text-sm font-bold flex items-center justify-center gap-2 bg-green-600/80 hover:bg-green-600 text-white transition-colors"
+            >
+              ✓ Sudah Terdaftar
+            </Link>
+          ) : (
+            <Link
+              to="/register"
+              className="btn-primary w-full py-2 rounded text-sm font-bold flex items-center justify-center gap-2"
+            >
+              <ArrowRight className="w-4 h-4" />
+              Daftar Sekarang
+            </Link>
+          )}
         </div>
 
         {/* Total Dana Terkumpul */}
