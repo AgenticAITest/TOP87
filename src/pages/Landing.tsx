@@ -243,7 +243,7 @@ export default function Landing() {
           <p className="text-[11px] text-gray-600 dark:text-gray-400 mb-3">
             {attendancePct >= 60
               ? 'Minimum kuota operasional tercapai ✓'
-              : `Butuh ${Math.max(0, Math.ceil(quotaTarget * 0.6) - approvedCount)} lagi untuk kuota minimum`}
+              : `Butuh ${Math.max(0, quotaTarget - approvedCount)} lagi untuk kuota minimum`}
           </p>
 
           {/* Attendance intent breakdown */}
