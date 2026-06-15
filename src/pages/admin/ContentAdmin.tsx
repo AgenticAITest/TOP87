@@ -1,7 +1,9 @@
-import { useState, ReactNode } from 'react';
-import { Check, Loader, FileText, BookOpen, Film, File } from 'lucide-react';
+import { useState, useRef, type ChangeEvent, ReactNode } from 'react';
+import { Check, Loader, FileText, BookOpen, Film, File, Upload } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
+import { useAuth } from '../../contexts/AuthContext';
+import { uploadFile, resolveMediaUrl } from '../../lib/storage';
 import {
   getContentConfig, setAboutContent, setYearbookContent,
   type AboutContent, type YearbookContent,
@@ -25,6 +27,7 @@ const TYPE_OPTIONS: { id: YearbookType; label: string; icon: ReactNode }[] = [
 ];
 
 export default function ContentAdmin() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -39,6 +42,26 @@ export default function ContentAdmin() {
 
   const heroUrl = aboutHeroUrl ?? data?.about.heroUrl ?? '';
   const body    = aboutBody    ?? data?.about.body    ?? '';
+
+  const aboutHeroFileRef = useRef<HTMLInputElement>(null);
+  const [aboutHeroUploading, setAboutHeroUploading] = useState(false);
+  const [aboutHeroUploadErr, setAboutHeroUploadErr] = useState<string | null>(null);
+
+  async function handleAboutHeroUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setAboutHeroUploading(true);
+    setAboutHeroUploadErr(null);
+    try {
+      const path = await uploadFile(file, user.id, () => {});
+      setAboutHeroUrl(resolveMediaUrl(path) ?? path);
+    } catch (err) {
+      setAboutHeroUploadErr((err as Error).message);
+    } finally {
+      setAboutHeroUploading(false);
+      if (aboutHeroFileRef.current) aboutHeroFileRef.current.value = '';
+    }
+  }
 
   const aboutMutation = useMutation({
     mutationFn: () => setAboutContent({ heroUrl, body }),
@@ -99,10 +122,19 @@ export default function ContentAdmin() {
             <h2 className="text-sm font-bold text-white uppercase tracking-widest">About — Our Story</h2>
           </div>
 
-          <Field label="Hero Image URL" hint="Optional banner shown at the top of the About page.">
-            <input value={heroUrl} onChange={e => setAboutHeroUrl(e.target.value)}
-              placeholder="https://example.com/photo.jpg"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors" />
+          <Field label="Hero Image" hint="Upload a photo or paste a direct image URL. Optional banner shown at the top of the About page.">
+            <div className="flex gap-2">
+              <input value={heroUrl} onChange={e => setAboutHeroUrl(e.target.value)}
+                placeholder="https://example.com/photo.jpg"
+                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors" />
+              <button type="button" onClick={() => aboutHeroFileRef.current?.click()} disabled={aboutHeroUploading}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 text-gray-400 hover:text-white hover:border-white/20 bg-white/[0.02] transition-all disabled:opacity-50 text-sm shrink-0">
+                {aboutHeroUploading ? <Loader size={14} className="animate-spin" /> : <Upload size={14} />}
+                {aboutHeroUploading ? 'Uploading…' : 'Upload'}
+              </button>
+              <input ref={aboutHeroFileRef} type="file" accept="image/*" className="hidden" onChange={handleAboutHeroUpload} />
+            </div>
+            {aboutHeroUploadErr && <p className="text-red-400 text-xs mt-1">{aboutHeroUploadErr}</p>}
           </Field>
 
           {heroUrl && (

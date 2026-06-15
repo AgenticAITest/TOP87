@@ -1,10 +1,11 @@
-import { useState, useEffect, ReactNode } from 'react';
+import { useState, useEffect, useRef, type ChangeEvent, ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { Check, Loader, ImageIcon, Megaphone, AlignLeft, ExternalLink } from 'lucide-react';
+import { Check, Loader, ImageIcon, Megaphone, AlignLeft, ExternalLink, Upload } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
 import { supabase } from '../../lib/supabase';
+import { uploadFile, resolveMediaUrl } from '../../lib/storage';
 import { fetchCharters, fetchCharterById, updateCharterContent } from '../../lib/queries';
 
 type Charter = Awaited<ReturnType<typeof fetchCharterById>>;
@@ -72,6 +73,26 @@ export default function AdminCMS() {
       setAnnouncement(selectedCharter.announcement ?? '');
     }
   }, [selectedCharter?.id]);
+
+  const heroFileRef = useRef<HTMLInputElement>(null);
+  const [heroUploading, setHeroUploading] = useState(false);
+  const [heroUploadErr, setHeroUploadErr] = useState<string | null>(null);
+
+  async function handleHeroUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setHeroUploading(true);
+    setHeroUploadErr(null);
+    try {
+      const path = await uploadFile(file, user.id, () => {});
+      setHeroUrl(resolveMediaUrl(path) ?? path);
+    } catch (err) {
+      setHeroUploadErr((err as Error).message);
+    } finally {
+      setHeroUploading(false);
+      if (heroFileRef.current) heroFileRef.current.value = '';
+    }
+  }
 
   const saveMutation = useMutation({
     mutationFn: () => updateCharterContent(selectedId, {
@@ -146,10 +167,19 @@ export default function AdminCMS() {
                 <h2 className="text-sm font-bold text-white uppercase tracking-widest">Hero Image</h2>
               </div>
 
-              <Field label="Image URL" hint="Paste any direct image URL. Displayed as a banner at the top of your charter page.">
-                <input value={heroUrl} onChange={e => setHeroUrl(e.target.value)}
-                  placeholder="https://example.com/photo.jpg"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors" />
+              <Field label="Hero Image" hint="Upload a photo or paste a direct image URL. Displayed as a banner at the top of your charter page.">
+                <div className="flex gap-2">
+                  <input value={heroUrl} onChange={e => setHeroUrl(e.target.value)}
+                    placeholder="https://example.com/photo.jpg"
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors" />
+                  <button type="button" onClick={() => heroFileRef.current?.click()} disabled={heroUploading}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 text-gray-400 hover:text-white hover:border-white/20 bg-white/[0.02] transition-all disabled:opacity-50 text-sm shrink-0">
+                    {heroUploading ? <Loader size={14} className="animate-spin" /> : <Upload size={14} />}
+                    {heroUploading ? 'Uploading…' : 'Upload'}
+                  </button>
+                  <input ref={heroFileRef} type="file" accept="image/*" className="hidden" onChange={handleHeroUpload} />
+                </div>
+                {heroUploadErr && <p className="text-red-400 text-xs mt-1">{heroUploadErr}</p>}
               </Field>
 
               {heroUrl.trim() && (

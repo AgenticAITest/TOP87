@@ -243,6 +243,46 @@ export default function SiteAdmin() {
   }
 
   // ── Backdrop file upload ──
+  const qrisFileRef = useRef<HTMLInputElement>(null);
+  const [qrisUploading, setQrisUploading] = useState(false);
+  const [qrisUploadErr, setQrisUploadErr] = useState<string | null>(null);
+
+  async function handleQrisImageUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setQrisUploading(true);
+    setQrisUploadErr(null);
+    try {
+      const path = await uploadFile(file, user.id, () => {});
+      patchQRIS('qris_image_url', resolveMediaUrl(path) ?? path);
+    } catch (err) {
+      setQrisUploadErr((err as Error).message);
+    } finally {
+      setQrisUploading(false);
+      if (qrisFileRef.current) qrisFileRef.current.value = '';
+    }
+  }
+
+  const flyerFileRef = useRef<HTMLInputElement>(null);
+  const [flyerUploading, setFlyerUploading] = useState(false);
+  const [flyerUploadErr, setFlyerUploadErr] = useState<string | null>(null);
+
+  async function handleFlyerUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setFlyerUploading(true);
+    setFlyerUploadErr(null);
+    try {
+      const path = await uploadFile(file, user.id, () => {});
+      setLocalFlyerUrl(resolveMediaUrl(path) ?? path);
+    } catch (err) {
+      setFlyerUploadErr((err as Error).message);
+    } finally {
+      setFlyerUploading(false);
+      if (flyerFileRef.current) flyerFileRef.current.value = '';
+    }
+  }
+
   const backdropFileRef = useRef<HTMLInputElement>(null);
   const [backdropUploading, setBackdropUploading] = useState(false);
   const [backdropUploadProgress, setBackdropUploadProgress] = useState(0);
@@ -427,10 +467,30 @@ export default function SiteAdmin() {
             <div className="text-gray-600 text-xs uppercase tracking-widest animate-pulse">Loading…</div>
           ) : (
             <div className="space-y-4 mb-6">
+              {/* QRIS image — upload + URL */}
+              <div>
+                <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1">Gambar QRIS</label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={activeQRIS.qris_image_url ?? ''}
+                    onChange={e => patchQRIS('qris_image_url', e.target.value)}
+                    placeholder="https://..."
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+                  />
+                  <button type="button" onClick={() => qrisFileRef.current?.click()} disabled={qrisUploading}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 text-gray-400 hover:text-white hover:border-white/20 bg-white/[0.02] transition-all disabled:opacity-50 text-sm shrink-0">
+                    {qrisUploading ? <Loader size={14} className="animate-spin" /> : <Upload size={14} />}
+                    {qrisUploading ? 'Uploading…' : 'Upload'}
+                  </button>
+                  <input ref={qrisFileRef} type="file" accept="image/*" className="hidden" onChange={handleQrisImageUpload} />
+                </div>
+                {qrisUploadErr && <p className="text-red-400 text-xs mt-1">{qrisUploadErr}</p>}
+              </div>
+
               {([
-                { key: 'qris_image_url' as const,    label: 'URL Gambar QRIS',    placeholder: 'https://...',  type: 'url' },
-                { key: 'qris_bank_name' as const,    label: 'Nama Bank',          placeholder: 'BCA / BRI…',  type: 'text' },
-                { key: 'qris_account_no' as const,   label: 'Nomor Rekening',     placeholder: '0123456789',  type: 'text' },
+                { key: 'qris_bank_name' as const,    label: 'Nama Bank',          placeholder: 'BCA / BRI…',    type: 'text' },
+                { key: 'qris_account_no' as const,   label: 'Nomor Rekening',     placeholder: '0123456789',    type: 'text' },
                 { key: 'qris_account_name' as const, label: 'Nama Pemilik',       placeholder: 'Panitia TOP87', type: 'text' },
               ]).map(({ key, label, placeholder, type }) => (
                 <div key={key}>
@@ -652,13 +712,22 @@ export default function SiteAdmin() {
             URL file PDF flyer anggaran. Jika diisi, link "Lihat Flyer Anggaran Lengkap" akan muncul di bagian bawah kartu Rincian Anggaran pada dashboard anggota.
           </p>
           <div className="space-y-3">
-            <input
-              type="url"
-              value={activeFlyerUrl}
-              onChange={e => setLocalFlyerUrl(e.target.value)}
-              placeholder="https://… (URL PDF dari Supabase Storage atau hosting lain)"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
-            />
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={activeFlyerUrl}
+                onChange={e => setLocalFlyerUrl(e.target.value)}
+                placeholder="https://… atau upload PDF"
+                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+              />
+              <button type="button" onClick={() => flyerFileRef.current?.click()} disabled={flyerUploading}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 text-gray-400 hover:text-white hover:border-white/20 bg-white/[0.02] transition-all disabled:opacity-50 text-sm shrink-0">
+                {flyerUploading ? <Loader size={14} className="animate-spin" /> : <Upload size={14} />}
+                {flyerUploading ? 'Uploading…' : 'Upload PDF'}
+              </button>
+              <input ref={flyerFileRef} type="file" accept="application/pdf" className="hidden" onChange={handleFlyerUpload} />
+            </div>
+            {flyerUploadErr && <p className="text-red-400 text-xs mt-1">{flyerUploadErr}</p>}
             {activeFlyerUrl && (
               <p className="text-xs text-gray-500 truncate">
                 Preview: <a href={activeFlyerUrl} target="_blank" rel="noopener noreferrer" className="text-gold hover:underline">{activeFlyerUrl}</a>
