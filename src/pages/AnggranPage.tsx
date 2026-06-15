@@ -1,38 +1,51 @@
 import { Info } from 'lucide-react';
 import { usePageContent } from '../hooks/usePageContent';
 
-interface BudgetItem {
-  no?: number;
-  keterangan: string;
-  total: string;
-  per_orang: string;
-  is_total?: boolean;
+interface AnggaranConfig {
+  mode: 'per_person' | 'per_category';
+  quota: number;
+  items: { keterangan: string; amount: number }[];
+  fee_per_orang?: number;
 }
 
-const DEFAULT_BUDGET: BudgetItem[] = [
-  { no: 1, keterangan: 'Akomodasi & Konsumsi Resort',          total: 'Rp 105.230.000', per_orang: 'Rp 863.000'   },
-  { no: 2, keterangan: 'Lunch Hari Pertama (Prasmanan Sunda)',  total: 'Rp 15.258.000',  per_orang: 'Rp 125.000'   },
-  { no: 3, keterangan: 'Outdoor Activity & Games',             total: 'Rp 25.620.000',  per_orang: 'Rp 210.000'   },
-];
-const DEFAULT_TOTAL = { total: 'Rp 246.108.000', per_orang: 'Rp 2.017.000' };
-const DEFAULT_NOTE  =
-  'Target dana terkumpul Rp 247.000.000. Selisih dana akan dialokasikan untuk Dana Sosial/Beasiswa & Yatim.';
+const DEFAULT_ANGGARAN_CONFIG: AnggaranConfig = {
+  mode: 'per_person',
+  quota: 122,
+  items: [
+    { keterangan: 'Akomodasi & Konsumsi Resort',          amount: 863000 },
+    { keterangan: 'Lunch Hari Pertama (Prasmanan Sunda)', amount: 125000 },
+    { keterangan: 'Outdoor Activity & Games',             amount: 210000 },
+    { keterangan: 'Transportasi & Logistik',              amount: 200000 },
+    { keterangan: 'Dokumentasi & Kenang-kenangan',        amount: 250000 },
+    { keterangan: 'Panitia & Lain-lain',                  amount: 369000 },
+  ],
+};
+
+const DEFAULT_NOTE =
+  'Selisih dana yang terkumpul akan dialokasikan untuk Dana Sosial, Beasiswa & Yatim.';
+
+function fmt(n: number) {
+  return 'Rp ' + n.toLocaleString('id-ID');
+}
 
 export default function AnggranPage() {
   const { data: cms } = usePageContent('anggaran');
 
-  let items = DEFAULT_BUDGET;
-  let total = DEFAULT_TOTAL;
-  if (cms?.['items.data']) {
-    try {
-      const parsed: BudgetItem[] = JSON.parse(cms['items.data']);
-      const totalRow = parsed.find(r => r.is_total);
-      items = parsed.filter(r => !r.is_total);
-      if (totalRow) total = { total: totalRow.total, per_orang: totalRow.per_orang };
-    } catch { /* use defaults */ }
+  let config = DEFAULT_ANGGARAN_CONFIG;
+  if (cms?.['items.config']) {
+    try { config = JSON.parse(cms['items.config']) as AnggaranConfig; }
+    catch { /* use defaults */ }
   }
 
-  const note = cms?.['notes.body'] ?? DEFAULT_NOTE;
+  const mode  = config.mode  ?? 'per_person';
+  const quota = config.quota ?? DEFAULT_ANGGARAN_CONFIG.quota;
+  const items = config.items ?? DEFAULT_ANGGARAN_CONFIG.items;
+  const note  = cms?.['notes.body'] ?? DEFAULT_NOTE;
+
+  const sumAmount  = items.reduce((s, i) => s + (i.amount || 0), 0);
+  const grandTotal = mode === 'per_person' ? sumAmount * quota : sumAmount;
+  const grandPerOrang = mode === 'per_person' ? sumAmount
+                        : quota > 0 ? Math.round(sumAmount / quota) : 0;
 
   return (
     <div className="p-6 md:p-8 max-w-4xl">
@@ -55,19 +68,33 @@ export default function AnggranPage() {
               </tr>
             </thead>
             <tbody className="text-gray-800">
-              {items.map((item, i) => (
-                <tr key={i} className="border-b border-amber-100 hover:bg-amber-50/50 transition-colors">
-                  <td className="py-4 text-gray-500">{item.no ?? i + 1}</td>
-                  <td className="py-4 font-medium">{item.keterangan}</td>
-                  <td className="py-4 text-right whitespace-nowrap">{item.total}</td>
-                  <td className="py-4 text-right whitespace-nowrap">{item.per_orang}</td>
-                </tr>
-              ))}
+              {items.map((item, i) => {
+                const perOrang   = mode === 'per_person' ? item.amount : (quota > 0 ? Math.round(item.amount / quota) : 0);
+                const totalBiaya = mode === 'per_person' ? item.amount * quota : item.amount;
+                return (
+                  <tr key={i} className="border-b border-amber-100 hover:bg-amber-50/50 transition-colors">
+                    <td className="py-4 text-gray-500">{i + 1}</td>
+                    <td className="py-4 font-medium">{item.keterangan}</td>
+                    <td className="py-4 text-right whitespace-nowrap">{fmt(totalBiaya)}</td>
+                    <td className="py-4 text-right whitespace-nowrap">{fmt(perOrang)}</td>
+                  </tr>
+                );
+              })}
               <tr className="font-bold text-gray-900 bg-amber-50">
                 <td className="py-4 px-2" colSpan={2}>TOTAL ANGGARAN REUNI</td>
-                <td className="py-4 text-right whitespace-nowrap">{total.total}</td>
-                <td className="py-4 text-right whitespace-nowrap">{total.per_orang}</td>
+                <td className="py-4 text-right whitespace-nowrap">{fmt(grandTotal)}</td>
+                <td className="py-4 text-right whitespace-nowrap">{fmt(grandPerOrang)}</td>
               </tr>
+              {config.fee_per_orang ? (
+                <tr className="border-t-2 border-amber-300 text-amber-700">
+                  <td colSpan={3} className="py-3 pr-4 text-right text-sm font-semibold">
+                    Target Iuran Kebersamaan Per Orang
+                  </td>
+                  <td className="py-3 text-right whitespace-nowrap font-bold">
+                    {fmt(config.fee_per_orang)}
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>
