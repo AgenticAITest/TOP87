@@ -82,12 +82,7 @@ function SidebarInner({
             <ChevronLeft size={14} />
           </button>
         )}
-        <div className="w-20 h-20 rounded-full border-2 border-gold/60 flex items-center justify-center mb-4">
-          <div>
-            <div className="text-xl font-bold text-gold font-serif leading-none">TOP87</div>
-            <div className="text-[8px] uppercase tracking-tighter text-gold/70 mt-0.5">ALUMNI ASSOC.</div>
-          </div>
-        </div>
+        <img src="/logo.png" alt="TOP87" className="w-20 h-20 object-contain mb-4 drop-shadow-[0_0_12px_rgba(212,175,55,0.4)]" />
         <h2 className="font-serif text-base font-bold text-gold tracking-widest uppercase leading-tight">
           Reuni 40 Tahun
         </h2>
