@@ -108,10 +108,11 @@ export default function Landing() {
   const grandPerOrang         = anggaranMode === 'per_person' ? sumAmount
                                 : (quotaTarget > 0 ? Math.round(sumAmount / quotaTarget) : 0);
 
-  const countdown     = useCountdown(reunionIso);
-  const approvedCount = dashboard?.approvedCount ?? 0;
-  const attendancePct = quotaTarget > 0 ? Math.min(Math.round((approvedCount / quotaTarget) * 100), 100) : 0;
-  const isApproved    = profile?.status === 'approved';
+  const countdown        = useCountdown(reunionIso);
+  const approvedCount    = dashboard?.approvedCount ?? 0;
+  const confirmedCount   = (dashboard?.attendance.yes ?? 0) + (dashboard?.attendance.most_likely ?? 0);
+  const attendancePct    = quotaTarget > 0 ? Math.min(Math.round((confirmedCount / quotaTarget) * 100), 100) : 0;
+  const isApproved       = profile?.status === 'approved';
 
   // Keringanan (financial assistance) modal
   const queryClient = useQueryClient();
@@ -227,7 +228,7 @@ export default function Landing() {
           </div>
           <div className="flex items-end justify-between mb-2">
             <div className="flex items-baseline">
-              <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">{approvedCount}</span>
+              <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">{confirmedCount}</span>
               <span className="text-gray-500 dark:text-gray-400 text-lg mx-1">/</span>
               <span className="text-xl text-gray-500 dark:text-gray-400">{quotaTarget}</span>
               <span className="ml-2 text-sm text-gray-400 dark:text-gray-500">Alumni</span>
@@ -243,7 +244,7 @@ export default function Landing() {
           <p className="text-[11px] text-gray-600 dark:text-gray-400 mb-3">
             {attendancePct >= 60
               ? 'Minimum kuota operasional tercapai ✓'
-              : `Butuh ${Math.max(0, quotaTarget - approvedCount)} lagi untuk kuota minimum`}
+              : `Butuh ${Math.max(0, quotaTarget - confirmedCount)} lagi untuk kuota minimum`}
           </p>
 
           {/* Attendance intent breakdown */}

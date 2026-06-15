@@ -30,7 +30,7 @@ async function fetchAllMembersAdmin() {
   });
 }
 
-type Status = 'all' | 'pending' | 'approved' | 'suspended' | 'rejected';
+type Status = 'all' | 'pending' | 'approved' | 'suspended' | 'rejected' | 'no_rsvp';
 type AttendanceFilter = 'all' | 'yes' | 'most_likely' | 'undecided' | 'no' | 'none';
 
 const ATTENDANCE_LABELS: Record<string, string> = {
@@ -63,7 +63,7 @@ function timeAgo(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-const STATUS_TABS: Status[] = ['all', 'pending', 'approved', 'suspended', 'rejected'];
+const STATUS_TABS: Status[] = ['all', 'pending', 'approved', 'suspended', 'rejected', 'no_rsvp'];
 
 export default function AllMembers() {
   const { user }       = useAuth();
@@ -90,11 +90,13 @@ export default function AllMembers() {
     pending:   members.filter(m => m.status === 'pending').length,
     approved:  members.filter(m => m.status === 'approved').length,
     suspended: members.filter(m => m.status === 'suspended').length,
+    no_rsvp:   members.filter(m => m.status === 'approved' && !m.reunion_attendance).length,
   }), [members]);
 
   const filtered = useMemo(() => {
     let r = members;
-    if (status !== 'all') r = r.filter(m => m.status === status);
+    if (status === 'no_rsvp') r = r.filter(m => m.status === 'approved' && !m.reunion_attendance);
+    else if (status !== 'all') r = r.filter(m => m.status === status);
     if (charterId)        r = r.filter(m => m.primaryCharterId === charterId);
     if (attendance === 'none') r = r.filter(m => !m.reunion_attendance);
     else if (attendance !== 'all') r = r.filter(m => m.reunion_attendance === attendance);
@@ -145,12 +147,13 @@ export default function AllMembers() {
       </div>
 
       {/* Stats bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
         {([
-          { label: 'Total',     key: 'total',     color: 'text-white' },
-          { label: 'Pending',   key: 'pending',   color: 'text-yellow-400' },
-          { label: 'Approved',  key: 'approved',  color: 'text-green-400' },
-          { label: 'Suspended', key: 'suspended', color: 'text-orange-400' },
+          { label: 'Total',      key: 'total',    color: 'text-white' },
+          { label: 'Pending',    key: 'pending',  color: 'text-yellow-400' },
+          { label: 'Approved',   key: 'approved', color: 'text-green-400' },
+          { label: 'Suspended',  key: 'suspended',color: 'text-orange-400' },
+          { label: 'Belum RSVP', key: 'no_rsvp', color: 'text-purple-400' },
         ] as const).map(s => (
           <div key={s.key} className="glass rounded-xl p-4 text-center">
             <p className={`text-2xl font-bold font-serif ${s.color}`}>
@@ -188,15 +191,23 @@ export default function AllMembers() {
       {/* Status tabs */}
       <div className="flex gap-1 flex-wrap items-center mb-6">
         {STATUS_TABS.map(s => {
-          const count = s === 'all' ? members.length : members.filter(m => m.status === s).length;
+          const TAB_LABELS: Record<Status, string> = {
+            all: 'All', pending: 'Pending', approved: 'Approved',
+            suspended: 'Suspended', rejected: 'Rejected', no_rsvp: 'Belum RSVP',
+          };
+          const count = s === 'no_rsvp' ? stats.no_rsvp
+            : s === 'all' ? members.length
+            : members.filter(m => m.status === s).length;
           return (
             <button key={s} onClick={() => setStatus(s)}
               className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
                 status === s
-                  ? 'bg-gold/15 text-gold border border-gold/30'
+                  ? s === 'no_rsvp'
+                    ? 'bg-purple-500/15 text-purple-400 border border-purple-400/30'
+                    : 'bg-gold/15 text-gold border border-gold/30'
                   : 'text-gray-500 hover:text-white border border-white/5 hover:border-white/15'
               }`}>
-              {s}{count > 0 && <span className="ml-1 opacity-60">{count}</span>}
+              {TAB_LABELS[s]}{count > 0 && <span className="ml-1 opacity-60">{count}</span>}
             </button>
           );
         })}
