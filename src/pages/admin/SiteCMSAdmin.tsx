@@ -83,15 +83,7 @@ const PAGES: Record<string, PageDef> = {
     sections: {
       items: {
         label: 'FAQ Items',
-        fields: {
-          data: {
-            label: 'FAQ items (JSON)',
-            type: 'json',
-            rows: 10,
-            hint: 'Array of {q: "question text", a: "answer text"}.',
-            template: FAQ_TEMPLATE,
-          },
-        },
+        fields: {},
       },
     },
   },
@@ -100,15 +92,7 @@ const PAGES: Record<string, PageDef> = {
     sections: {
       items: {
         label: 'Announcements',
-        fields: {
-          data: {
-            label: 'Announcements (JSON)',
-            type: 'json',
-            rows: 10,
-            hint: 'Array of {title, body, date, highlight: true|false}.',
-            template: PENGUMUMAN_TEMPLATE,
-          },
-        },
+        fields: {},
       },
     },
   },
@@ -378,6 +362,179 @@ function AnggaranEditor({ initialJson, onSaved }: { initialJson: string; onSaved
   );
 }
 
+// ─── FAQ editor ───────────────────────────────────────────────────────────────
+
+interface FaqItem { q: string; a: string; }
+
+function FaqEditor({ initialJson, onSaved }: { initialJson: string; onSaved: () => void }) {
+  const initial = useMemo<FaqItem[]>(() => {
+    try { const p = JSON.parse(initialJson); return Array.isArray(p) ? p : []; }
+    catch { return []; }
+  }, [initialJson]);
+
+  const [items, setItems] = useState<FaqItem[]>(initial);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => { setItems(initial); }, [initial]);
+
+  const isDirty = JSON.stringify(items) !== JSON.stringify(initial);
+
+  const { mutate, isPending, isError, error } = useMutation({
+    mutationFn: () => upsertField('faq', 'items', 'data', JSON.stringify(items), 'json'),
+    onSuccess: () => { setSaved(true); onSaved(); setTimeout(() => setSaved(false), 2000); },
+  });
+
+  function update(idx: number, field: keyof FaqItem, val: string) {
+    setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: val } : it));
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.length === 0 && (
+        <p className="text-xs text-gray-600 italic py-2">Belum ada pertanyaan. Klik "Tambah" untuk mulai.</p>
+      )}
+      {items.map((item, idx) => (
+        <div key={idx} className="rounded-xl border border-white/5 bg-white/[0.02] p-4 space-y-2">
+          <div className="flex items-start gap-2">
+            <span className="text-xs text-gray-600 w-5 text-right shrink-0 mt-2.5">{idx + 1}</span>
+            <div className="flex-1 space-y-2">
+              <input
+                value={item.q}
+                onChange={e => update(idx, 'q', e.target.value)}
+                placeholder="Pertanyaan…"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+              />
+              <textarea
+                value={item.a}
+                onChange={e => update(idx, 'a', e.target.value)}
+                placeholder="Jawaban…"
+                rows={2}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors resize-none"
+              />
+            </div>
+            <button type="button" onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}
+              className="text-gray-600 hover:text-red-400 transition-colors p-1 shrink-0 mt-1">
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      ))}
+
+      <button type="button" onClick={() => setItems(prev => [...prev, { q: '', a: '' }])}
+        className="text-xs text-gold/60 hover:text-gold transition-colors flex items-center gap-1.5">
+        <Plus size={12} /> Tambah pertanyaan
+      </button>
+
+      <div className="flex items-center gap-3 pt-3 border-t border-white/5">
+        {isDirty ? (
+          <button type="button" onClick={() => mutate()} disabled={isPending}
+            className="flex items-center gap-2 bg-gold/15 hover:bg-gold/25 text-gold border border-gold/30 rounded-xl px-4 py-2 text-sm font-bold transition-all disabled:opacity-50">
+            {isPending ? <Loader size={13} className="animate-spin" /> : saved ? <Check size={13} /> : null}
+            {isPending ? 'Menyimpan…' : saved ? 'Tersimpan' : 'Simpan'}
+          </button>
+        ) : saved ? (
+          <span className="flex items-center gap-1.5 text-green-400 text-xs"><Check size={12} /> Tersimpan</span>
+        ) : null}
+        {isError && <p className="text-red-400 text-sm">{(error as Error).message}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Pengumuman editor ────────────────────────────────────────────────────────
+
+interface PengumumanItem { title: string; body: string; date: string; highlight: boolean; }
+
+function PengumumanEditor({ initialJson, onSaved }: { initialJson: string; onSaved: () => void }) {
+  const initial = useMemo<PengumumanItem[]>(() => {
+    try { const p = JSON.parse(initialJson); return Array.isArray(p) ? p : []; }
+    catch { return []; }
+  }, [initialJson]);
+
+  const [items, setItems] = useState<PengumumanItem[]>(initial);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => { setItems(initial); }, [initial]);
+
+  const isDirty = JSON.stringify(items) !== JSON.stringify(initial);
+
+  const { mutate, isPending, isError, error } = useMutation({
+    mutationFn: () => upsertField('pengumuman', 'items', 'data', JSON.stringify(items), 'json'),
+    onSuccess: () => { setSaved(true); onSaved(); setTimeout(() => setSaved(false), 2000); },
+  });
+
+  function update(idx: number, field: keyof PengumumanItem, val: string | boolean) {
+    setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: val } : it));
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.length === 0 && (
+        <p className="text-xs text-gray-600 italic py-2">Belum ada pengumuman. Klik "Tambah" untuk mulai.</p>
+      )}
+      {items.map((item, idx) => (
+        <div key={idx} className="rounded-xl border border-white/5 bg-white/[0.02] p-4 space-y-2">
+          <div className="flex items-start gap-2">
+            <span className="text-xs text-gray-600 w-5 text-right shrink-0 mt-2.5">{idx + 1}</span>
+            <div className="flex-1 space-y-2">
+              <div className="flex gap-2">
+                <input
+                  value={item.title}
+                  onChange={e => update(idx, 'title', e.target.value)}
+                  placeholder="Judul pengumuman…"
+                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+                />
+                <input
+                  value={item.date}
+                  onChange={e => update(idx, 'date', e.target.value)}
+                  placeholder="misal: 14 Jun 2026"
+                  className="w-36 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors"
+                />
+              </div>
+              <textarea
+                value={item.body}
+                onChange={e => update(idx, 'body', e.target.value)}
+                placeholder="Isi pengumuman…"
+                rows={2}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors resize-none"
+              />
+              <label className="flex items-center gap-2 cursor-pointer w-fit">
+                <input type="checkbox" checked={item.highlight}
+                  onChange={e => update(idx, 'highlight', e.target.checked)}
+                  className="w-4 h-4 accent-[#D4AF37] rounded" />
+                <span className="text-xs text-gray-400">Highlight (garis emas di kiri)</span>
+              </label>
+            </div>
+            <button type="button" onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}
+              className="text-gray-600 hover:text-red-400 transition-colors p-1 shrink-0 mt-1">
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      ))}
+
+      <button type="button"
+        onClick={() => setItems(prev => [...prev, { title: '', body: '', date: '', highlight: false }])}
+        className="text-xs text-gold/60 hover:text-gold transition-colors flex items-center gap-1.5">
+        <Plus size={12} /> Tambah pengumuman
+      </button>
+
+      <div className="flex items-center gap-3 pt-3 border-t border-white/5">
+        {isDirty ? (
+          <button type="button" onClick={() => mutate()} disabled={isPending}
+            className="flex items-center gap-2 bg-gold/15 hover:bg-gold/25 text-gold border border-gold/30 rounded-xl px-4 py-2 text-sm font-bold transition-all disabled:opacity-50">
+            {isPending ? <Loader size={13} className="animate-spin" /> : saved ? <Check size={13} /> : null}
+            {isPending ? 'Menyimpan…' : saved ? 'Tersimpan' : 'Simpan'}
+          </button>
+        ) : saved ? (
+          <span className="flex items-center gap-1.5 text-green-400 text-xs"><Check size={12} /> Tersimpan</span>
+        ) : null}
+        {isError && <p className="text-red-400 text-sm">{(error as Error).message}</p>}
+      </div>
+    </div>
+  );
+}
+
 // ─── Field component ──────────────────────────────────────────────────────────
 
 function FieldEditor({
@@ -606,7 +763,9 @@ export default function SiteCMSAdmin() {
         ) : (
           <div className="max-w-2xl space-y-8">
             {Object.entries(activePage.sections).map(([sectionKey, section]) => {
-              const isAnggaranItems = activePageKey === 'anggaran' && sectionKey === 'items';
+              const isAnggaranItems   = activePageKey === 'anggaran'   && sectionKey === 'items';
+              const isFaqItems        = activePageKey === 'faq'        && sectionKey === 'items';
+              const isPengumumanItems = activePageKey === 'pengumuman' && sectionKey === 'items';
               return (
                 <section key={sectionKey} className="glass rounded-2xl p-6 space-y-6">
                   <h2 className="text-sm font-bold text-white uppercase tracking-widest border-b border-white/5 pb-3">
@@ -615,6 +774,16 @@ export default function SiteCMSAdmin() {
                   {isAnggaranItems ? (
                     <AnggaranEditor
                       initialJson={cms['items.config'] ?? ''}
+                      onSaved={onFieldSaved}
+                    />
+                  ) : isFaqItems ? (
+                    <FaqEditor
+                      initialJson={cms['items.data'] ?? ''}
+                      onSaved={onFieldSaved}
+                    />
+                  ) : isPengumumanItems ? (
+                    <PengumumanEditor
+                      initialJson={cms['items.data'] ?? ''}
                       onSaved={onFieldSaved}
                     />
                   ) : (

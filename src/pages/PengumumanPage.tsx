@@ -1,24 +1,23 @@
+import { usePageContent } from '../hooks/usePageContent';
+
+interface PengumumanItem { title: string; body: string; date: string; highlight: boolean; }
+
+const DEFAULT_PENGUMUMAN: PengumumanItem[] = [
+  { title: 'Kostum Hari Ke-1: Putih',    body: 'Ayo seragamkan dresscode agar dokumentasi terlihat kompak!',                         date: '10 Jan 2026', highlight: true  },
+  { title: 'Pembayaran Cicilan Ke-2',     body: 'Mohon segera dilunasi sebelum tgl 12 Feb 2026 untuk konfirmasi akomodasi.',          date: '05 Jan 2026', highlight: false },
+  { title: 'Pendaftaran Dibuka',          body: 'Portal pendaftaran resmi reuni TOP87 telah dibuka. Segera daftarkan dirimu!',         date: '01 Jan 2026', highlight: false },
+];
+
 export default function PengumumanPage() {
-  const announcements = [
-    {
-      title:     'Kostum Hari Ke-1: Putih',
-      body:      'Ayo seragamkan dresscode agar dokumentasi terlihat kompak!',
-      date:      '10 Jan 2026',
-      highlight: true,
-    },
-    {
-      title:     'Pembayaran Cicilan Ke-2',
-      body:      'Mohon segera dilunasi sebelum tgl 12 Feb 2026 untuk konfirmasi akomodasi.',
-      date:      '05 Jan 2026',
-      highlight: false,
-    },
-    {
-      title:     'Pendaftaran Dibuka',
-      body:      'Portal pendaftaran resmi reuni TOP87 telah dibuka. Segera daftarkan dirimu!',
-      date:      '01 Jan 2026',
-      highlight: false,
-    },
-  ];
+  const { data: cms } = usePageContent('pengumuman');
+
+  let announcements = DEFAULT_PENGUMUMAN;
+  if (cms?.['items.data']) {
+    try {
+      const parsed = JSON.parse(cms['items.data']);
+      if (Array.isArray(parsed) && parsed.length > 0) announcements = parsed;
+    } catch { /* use defaults */ }
+  }
 
   return (
     <div className="p-6 md:p-8 max-w-3xl">
