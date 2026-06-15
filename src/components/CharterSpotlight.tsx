@@ -4,12 +4,6 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { qk, fetchCharters } from '../lib/queries';
 
-const IMAGES: Record<string, string> = {
-  jakarta:   'https://images.unsplash.com/photo-1555899434-94d1368aa7af?auto=format&fit=crop&q=80&w=600&h=400',
-  bandung:   '/gedung_sate.png',
-  us:        'https://images.unsplash.com/photo-1501594907352-04cda38ebc29?auto=format&fit=crop&q=80&w=600&h=400',
-  australia: 'https://images.unsplash.com/photo-1523482580672-f109ba8cb9be?auto=format&fit=crop&q=80&w=600&h=400',
-};
 
 export default function CharterSpotlight() {
   const { data: charters = [], isLoading } = useQuery({
@@ -44,9 +38,9 @@ export default function CharterSpotlight() {
               className="group glass-card rounded-xl overflow-hidden hover:border-gold/30 transition-all duration-500 shadow-sm"
             >
               <div className="h-44 relative overflow-hidden">
-                {IMAGES[charter.slug] ? (
+                {(charter as any).hero_image_url ? (
                   <img
-                    src={IMAGES[charter.slug]}
+                    src={(charter as any).hero_image_url}
                     alt={charter.name}
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700"

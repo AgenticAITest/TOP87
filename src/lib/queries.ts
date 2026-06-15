@@ -65,7 +65,7 @@ async function charterScope(isSuperAdmin: boolean, charterIds: string[]) {
 
 export async function fetchCharters() {
   const [{ data: charterData, error }, { data: memberData }] = await Promise.all([
-    supabase.from('charters').select('id, slug, name, city, country, description').order('name'),
+    supabase.from('charters').select('id, slug, name, city, country, description, hero_image_url').order('name'),
     supabase.from('charter_members').select('charter_id'),
   ]);
   must(charterData, error);
