@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, type ChangeEvent, ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { Check, Loader, HardDrive, Cloud, Shuffle, List, Search, X, Users, ToggleLeft, ToggleRight, QrCode, FileText, Monitor, Upload } from 'lucide-react';
+import { Check, Loader, HardDrive, Cloud, Shuffle, List, Search, X, Users, ToggleLeft, ToggleRight, QrCode, FileText, Monitor, Upload, Zap, ExternalLink } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { getStorageBackend, setStorageBackend, uploadFile, resolveMediaUrl, type StorageBackend } from '../../lib/storage';
@@ -14,6 +14,7 @@ import {
   type FeaturedMode, type FeaturedConfig, type QRISConfig,
   qk,
 } from '../../lib/queries';
+import { getR2WorkerUrl, setR2WorkerUrl } from '../../lib/storage';
 
 // ─── Storage backend ──────────────────────────────────────────────────────────
 
@@ -29,6 +30,12 @@ const BACKENDS: { id: StorageBackend; label: string; description: string; icon: 
     label: 'VPS (top87.id)',
     description: '94 GB free on srv1664106.hstgr.cloud. Files served via media.top87.id.',
     icon: <HardDrive size={20} />,
+  },
+  {
+    id: 'r2',
+    label: 'Cloudflare R2',
+    description: 'Zero egress cost. Files served via Cloudflare Worker at media.top87.id.',
+    icon: <Zap size={20} />,
   },
 ];
 
@@ -123,6 +130,48 @@ export default function SiteAdmin() {
       setTimeout(() => setStorageSaved(false), 2000);
     },
   });
+
+  // ── R2 Worker URL state ──
+  const [r2UrlSaved, setR2UrlSaved]     = useState(false);
+  const [localR2Url, setLocalR2Url]     = useState<string | null>(null);
+  const [r2Testing,  setR2Testing]      = useState(false);
+  const [r2TestResult, setR2TestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const { data: currentR2Url = '' } = useQuery({
+    queryKey: ['site_settings', 'r2_worker_url'],
+    queryFn:  getR2WorkerUrl,
+  });
+  const activeR2Url  = localR2Url ?? currentR2Url;
+  const r2UrlDirty   = localR2Url !== null && localR2Url !== currentR2Url;
+
+  const r2UrlMutation = useMutation({
+    mutationFn: () => setR2WorkerUrl(activeR2Url),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['site_settings', 'r2_worker_url'] });
+      setLocalR2Url(null);
+      setR2UrlSaved(true);
+      setTimeout(() => setR2UrlSaved(false), 2000);
+    },
+  });
+
+  async function testR2Worker() {
+    setR2Testing(true);
+    setR2TestResult(null);
+    try {
+      const res = await fetch(`${activeR2Url || 'https://media.top87.id'}/upload`, {
+        method: 'OPTIONS',
+      });
+      if (res.ok || res.status === 204) {
+        setR2TestResult({ ok: true, msg: 'Worker reachable — CORS preflight OK' });
+      } else {
+        setR2TestResult({ ok: false, msg: `Unexpected status ${res.status}` });
+      }
+    } catch (err) {
+      setR2TestResult({ ok: false, msg: (err as Error).message });
+    } finally {
+      setR2Testing(false);
+    }
+  }
 
   // ── QRIS config state ──
   const [qrisSaved, setQrisSaved] = useState(false);
@@ -451,6 +500,64 @@ export default function SiteAdmin() {
               </p>
             </div>
           )}
+        </section>
+
+        {/* ── R2 Worker Config ── */}
+        <section className="glass rounded-2xl p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Zap size={16} className="text-gold/60" />
+            <h2 className="text-white font-bold text-lg">Cloudflare R2 Worker</h2>
+          </div>
+          <p className="text-gray-500 text-sm mb-6">
+            Worker URL for the R2 media backend. Default is{' '}
+            <code className="font-mono text-gray-400">https://media.top87.id</code>.
+          </p>
+
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1">Worker URL</label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={activeR2Url}
+                  onChange={e => setLocalR2Url(e.target.value)}
+                  placeholder="https://media.top87.id"
+                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-gold/50 transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={testR2Worker}
+                  disabled={r2Testing}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 text-gray-400 hover:text-white hover:border-white/20 bg-white/[0.02] transition-all disabled:opacity-50 text-sm shrink-0"
+                >
+                  {r2Testing ? <Loader size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+                  {r2Testing ? 'Testing…' : 'Test'}
+                </button>
+              </div>
+              {r2TestResult && (
+                <p className={`text-xs mt-2 ${r2TestResult.ok ? 'text-green-400' : 'text-red-400'}`}>
+                  {r2TestResult.ok ? '✓' : '✗'} {r2TestResult.msg}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => r2UrlMutation.mutate()}
+              disabled={r2UrlMutation.isPending || !r2UrlDirty}
+              className="flex items-center gap-2 bg-gold hover:bg-gold/90 text-charcoal font-bold py-2.5 px-6 rounded-full transition-all disabled:opacity-40 uppercase tracking-widest text-xs"
+            >
+              {r2UrlMutation.isPending
+                ? <><Loader size={14} className="animate-spin" /> Saving…</>
+                : r2UrlSaved
+                  ? <><Check size={14} /> Saved</>
+                  : 'Save'}
+            </button>
+            {r2UrlMutation.isError && (
+              <p className="text-red-400 text-xs">{(r2UrlMutation.error as Error).message}</p>
+            )}
+          </div>
         </section>
 
         {/* ── QRIS / Payment Config ── */}

@@ -1,0 +1,12 @@
+name = "top87-media-worker"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+account_id = "387131e0eb86dca1ecb5e92f697baa25"
+
+[[r2_buckets]]
+binding = "TOP87_BUCKET"
+bucket_name = "top87bucket"
+
+[[routes]]
+pattern = "media.top87.id/*"
+zone_name = "top87.id"

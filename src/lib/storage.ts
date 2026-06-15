@@ -1,9 +1,10 @@
 import { supabase } from './supabase';
 
-export type StorageBackend = 'supabase' | 'vps';
+export type StorageBackend = 'supabase' | 'vps' | 'r2';
 
-const VPS_UPLOAD_URL = 'https://media.top87.id/api/upload';
-const VPS_BASE_URL   = 'https://media.top87.id/uploads';
+const VPS_UPLOAD_URL    = 'https://media.top87.id/api/upload';
+const VPS_BASE_URL      = 'https://media.top87.id/uploads';
+const R2_WORKER_DEFAULT = 'https://media.top87.id';
 
 // Resolve a storage_path to a displayable URL.
 // - Full https:// URLs (VPS) are returned as-is.
@@ -23,6 +24,22 @@ export async function getStorageBackend(): Promise<StorageBackend> {
   return (data?.value as StorageBackend) ?? 'supabase';
 }
 
+export async function getR2WorkerUrl(): Promise<string> {
+  const { data } = await supabase
+    .from('site_settings')
+    .select('value')
+    .eq('key', 'r2_worker_url')
+    .single();
+  return data?.value ?? R2_WORKER_DEFAULT;
+}
+
+export async function setR2WorkerUrl(url: string): Promise<void> {
+  const { error } = await supabase
+    .from('site_settings')
+    .upsert({ key: 'r2_worker_url', value: url, updated_at: new Date().toISOString() });
+  if (error) throw error;
+}
+
 export async function setStorageBackend(backend: StorageBackend): Promise<void> {
   const { error } = await supabase
     .from('site_settings')
@@ -31,16 +48,16 @@ export async function setStorageBackend(backend: StorageBackend): Promise<void> 
 }
 
 // Upload a file using the currently active storage backend.
-// Returns a storage_path: full URL for VPS, bare path for Supabase.
+// Returns a storage_path: full URL for VPS/R2, bare path for Supabase.
 export async function uploadFile(
   file: File,
   userId: string,
   onProgress?: (pct: number) => void
 ): Promise<string> {
   const backend = await getStorageBackend();
-  return backend === 'vps'
-    ? uploadToVPS(file, userId, onProgress)
-    : uploadToSupabase(file, userId, onProgress);
+  if (backend === 'vps')  return uploadToVPS(file, userId, onProgress);
+  if (backend === 'r2')   return uploadToR2(file, userId, onProgress);
+  return uploadToSupabase(file, userId, onProgress);
 }
 
 async function uploadToSupabase(
@@ -98,6 +115,46 @@ async function uploadToVPS(
     };
     xhr.onerror = () => reject(new Error('VPS upload failed: network error'));
     xhr.send(formData);
+  });
+}
+
+async function uploadToR2(
+  file: File,
+  userId: string,
+  onProgress?: (pct: number) => void
+): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated');
+
+  const workerUrl = await getR2WorkerUrl();
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin';
+
+  return new Promise<string>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${workerUrl}/upload`);
+    xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
+    xhr.setRequestHeader('X-User-Id', userId);
+    xhr.setRequestHeader('X-File-Ext', ext);
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress?.(Math.round((e.loaded / e.total) * 100));
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const { url } = JSON.parse(xhr.responseText);
+          resolve(url);
+        } catch {
+          reject(new Error('Invalid response from R2 worker'));
+        }
+      } else {
+        reject(new Error(`R2 upload failed: ${xhr.status} ${xhr.statusText}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('R2 upload failed: network error'));
+    xhr.send(file);
   });
 }
 
