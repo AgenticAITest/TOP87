@@ -8,7 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
 import { qk, fetchAdminMembers } from '../../lib/queries';
 
-type Status = 'all' | 'pending' | 'approved' | 'suspended' | 'rejected';
+type Status = 'all' | 'pending' | 'approved' | 'suspended' | 'rejected' | 'no_rsvp';
 
 const STATUS_COLORS: Record<string, string> = {
   pending:   'bg-yellow-500/10 text-yellow-400',
@@ -43,7 +43,8 @@ export default function AdminMembers() {
 
   const filtered = useMemo(() => {
     let result = members;
-    if (status !== 'all') result = result.filter(m => m.status === status);
+    if (status === 'no_rsvp') result = result.filter(m => m.status === 'approved' && !m.reunion_attendance);
+    else if (status !== 'all') result = result.filter(m => m.status === status);
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(m =>
@@ -87,9 +88,15 @@ export default function AdminMembers() {
     onError: (err: Error) => alert(`Delete failed: ${err.message}`),
   });
 
-  const statusTabs: Status[] = ['all', 'pending', 'approved', 'suspended', 'rejected'];
+  const statusTabs: Status[] = ['all', 'pending', 'approved', 'suspended', 'rejected', 'no_rsvp'];
+  const TAB_LABELS: Record<Status, string> = {
+    all: 'All', pending: 'Pending', approved: 'Approved',
+    suspended: 'Suspended', rejected: 'Rejected', no_rsvp: 'Belum RSVP',
+  };
   const counts = statusTabs.reduce((acc, s) => {
-    acc[s] = s === 'all' ? members.length : members.filter(m => m.status === s).length;
+    acc[s] = s === 'no_rsvp' ? members.filter(m => m.status === 'approved' && !m.reunion_attendance).length
+           : s === 'all'     ? members.length
+           : members.filter(m => m.status === s).length;
     return acc;
   }, {} as Record<string, number>);
 
@@ -112,10 +119,12 @@ export default function AdminMembers() {
             <button key={s} onClick={() => setStatus(s)}
               className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
                 status === s
-                  ? 'bg-gold/15 text-gold border border-gold/30'
+                  ? s === 'no_rsvp'
+                    ? 'bg-purple-500/15 text-purple-400 border border-purple-400/30'
+                    : 'bg-gold/15 text-gold border border-gold/30'
                   : 'text-gray-500 hover:text-white border border-white/5 hover:border-white/15'
               }`}>
-              {s} {counts[s] > 0 && <span className="ml-1 opacity-60">{counts[s]}</span>}
+              {TAB_LABELS[s]} {counts[s] > 0 && <span className="ml-1 opacity-60">{counts[s]}</span>}
             </button>
           ))}
         </div>

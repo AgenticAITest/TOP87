@@ -281,7 +281,7 @@ export async function fetchAdminMembers(isSuperAdmin: boolean, charterIds: strin
   const profileIds = await charterScope(isSuperAdmin, charterIds);
   const q = supabase
     .from('profiles')
-    .select('id, name, avatar_url, city, profession, status, created_at, charter_members(is_primary, charters(name))')
+    .select('id, name, avatar_url, city, profession, status, reunion_attendance, created_at, charter_members(is_primary, charters(name))')
     .order('created_at', { ascending: false });
   const { data, error } = profileIds ? await q.in('id', profileIds) : await q;
   must(data, error);
@@ -289,6 +289,7 @@ export async function fetchAdminMembers(isSuperAdmin: boolean, charterIds: strin
     const primary = (p.charter_members ?? []).find((cm: any) => cm.is_primary);
     return { id: p.id, name: p.name, avatar_url: p.avatar_url,
              city: p.city, profession: p.profession, status: p.status as string,
+             reunion_attendance: (p.reunion_attendance ?? null) as string | null,
              created_at: p.created_at as string,
              primaryCharter: primary?.charters?.name ?? null };
   });
