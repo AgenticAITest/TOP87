@@ -44,6 +44,8 @@ const DEFAULT_ANNOUNCEMENTS = [
   { title: 'Pembayaran Cicilan Ke-2',     body: 'Mohon segera dilunasi sebelum tgl 12 Feb 2024 untuk konfirmasi akomodasi.',          highlight: false },
 ];
 
+interface AnnouncementItem { title: string; body: string; date?: string; highlight: boolean; }
+
 // ── Countdown helper ──────────────────────────────────────────────────────────
 
 function calcTimeLeft(iso: string) {
@@ -69,8 +71,9 @@ function useCountdown(iso: string) {
 
 export default function Landing() {
   const { user, profile } = useAuth();
-  const { data: landingCms }  = usePageContent('landing');
-  const { data: anggaranCms } = usePageContent('anggaran');
+  const { data: landingCms }      = usePageContent('landing');
+  const { data: anggaranCms }     = usePageContent('anggaran');
+  const { data: pengumumanCms }   = usePageContent('pengumuman');
   const { data: dashboard }   = useDashboardData();
   const { data: flags }       = useFeatureFlags();
   const { data: flyerUrl = '' } = useQuery({
@@ -719,12 +722,21 @@ export default function Landing() {
               </svg>
             </div>
             <div className="space-y-4">
-              {DEFAULT_ANNOUNCEMENTS.map((ann, i) => (
-                <div key={i} className={`border-l-4 pl-3 ${ann.highlight ? 'border-gold' : 'border-amber-200 dark:border-amber-700/50'}`}>
-                  <h4 className="text-xs font-bold text-gray-900 dark:text-gray-100 uppercase">{ann.title}</h4>
-                  <p className="text-[10px] text-gray-600 dark:text-gray-400 mt-0.5">{ann.body}</p>
-                </div>
-              ))}
+              {(() => {
+                let items: AnnouncementItem[] = DEFAULT_ANNOUNCEMENTS;
+                if (pengumumanCms?.['items.data']) {
+                  try {
+                    const parsed = JSON.parse(pengumumanCms['items.data']);
+                    if (Array.isArray(parsed) && parsed.length > 0) items = parsed;
+                  } catch { /* use defaults */ }
+                }
+                return items.slice(0, 3).map((ann, i) => (
+                  <div key={i} className={`border-l-4 pl-3 ${ann.highlight ? 'border-gold' : 'border-amber-200 dark:border-amber-700/50'}`}>
+                    <h4 className="text-xs font-bold text-gray-900 dark:text-gray-100 uppercase">{ann.title}</h4>
+                    <p className="text-[10px] text-gray-600 dark:text-gray-400 mt-0.5">{ann.body}</p>
+                  </div>
+                ));
+              })()}
             </div>
             <Link
               to="/pengumuman"
