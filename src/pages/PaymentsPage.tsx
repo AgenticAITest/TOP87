@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import { CreditCard, CheckCircle, Clock, XCircle, Receipt, ExternalLink } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchMyPayments, qk, type Payment } from '../lib/queries';
+import { fetchMyPayments, fetchMemberIuranPaid, qk, type Payment } from '../lib/queries';
 import QRISModal from '../components/QRISModal';
 
 type Tab = 'reunion_fee' | 'donation';
@@ -28,6 +28,12 @@ export default function PaymentsPage() {
   const { data: payments = [], isLoading } = useQuery({
     queryKey: qk.payments(profile?.id ?? ''),
     queryFn:  () => fetchMyPayments(profile!.id),
+    enabled:  !!profile?.id,
+  });
+
+  const { data: iuranPaid = false } = useQuery({
+    queryKey: qk.memberIuranPaid(profile?.id ?? ''),
+    queryFn:  () => fetchMemberIuranPaid(profile!.id),
     enabled:  !!profile?.id,
   });
 
@@ -89,13 +95,20 @@ export default function PaymentsPage() {
               )}
             </div>
           </div>
-          <button
-            onClick={() => setShowModal(true)}
-            className="btn-primary flex items-center gap-2 py-2.5 px-5 rounded-full font-bold uppercase tracking-widest text-xs whitespace-nowrap shrink-0"
-          >
-            <Receipt size={14} />
-            Bayar Sekarang
-          </button>
+          {tab === 'reunion_fee' && iuranPaid ? (
+            <span className="flex items-center gap-2 py-2.5 px-5 rounded-full font-bold uppercase tracking-widest text-xs whitespace-nowrap shrink-0 bg-green-100 text-green-700 border border-green-200">
+              <CheckCircle size={14} />
+              Iuran Lunas
+            </span>
+          ) : (
+            <button
+              onClick={() => setShowModal(true)}
+              className="btn-primary flex items-center gap-2 py-2.5 px-5 rounded-full font-bold uppercase tracking-widest text-xs whitespace-nowrap shrink-0"
+            >
+              <Receipt size={14} />
+              Bayar Sekarang
+            </button>
+          )}
         </div>
       </div>
 
@@ -106,7 +119,9 @@ export default function PaymentsPage() {
         <div className="text-center py-16 text-gray-400 text-sm">
           <CreditCard size={32} className="mx-auto mb-3 opacity-30" />
           <p className="text-gray-600">Belum ada riwayat {tabLabel.toLowerCase()}.</p>
-          <p className="text-xs mt-1 text-gray-400">Klik "Bayar Sekarang" untuk melakukan pembayaran.</p>
+          {!(tab === 'reunion_fee' && iuranPaid) && (
+            <p className="text-xs mt-1 text-gray-400">Klik "Bayar Sekarang" untuk melakukan pembayaran.</p>
+          )}
         </div>
       ) : (
         <div className="space-y-2">

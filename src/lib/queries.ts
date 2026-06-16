@@ -48,6 +48,8 @@ export const qk = {
   allKeringanan:    ()                                      => ['keringanan', 'all']                          as const,
   // Payment summary report
   paymentSummary:   (isSuperAdmin: boolean, ids: string[]) => ['admin', 'payment-summary', isSuperAdmin, ...ids] as const,
+  // Member iuran ledger status
+  memberIuranPaid:  (profileId: string)                    => ['member-iuran-paid', profileId]                   as const,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -748,6 +750,18 @@ export async function savePaymentAllocations(
   }).then(({ error }) => {
     if (error) console.error('[audit_log] insert failed:', error.message);
   });
+}
+
+// Returns true if the member has at least one credit in their iuran account_transactions
+export async function fetchMemberIuranPaid(profileId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('account_transactions')
+    .select('id, member_accounts!inner(profile_id, account_type)')
+    .eq('member_accounts.profile_id', profileId)
+    .eq('member_accounts.account_type', 'iuran')
+    .limit(1);
+  if (error) throw error;
+  return (data?.length ?? 0) > 0;
 }
 
 export async function fetchPaymentTotals(): Promise<{ reunion_fee: number; donation: number }> {
