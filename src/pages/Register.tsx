@@ -7,11 +7,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { qk, fetchCharters } from '../lib/queries';
 
 const ATTENDANCE_OPTIONS = [
-  { value: 'yes',         label: 'Ya, aku hadir!',        color: 'text-green-700 bg-green-50 border-green-300' },
-  { value: 'most_likely', label: 'Berencana Hadir',         color: 'text-blue-700  bg-blue-50  border-blue-300' },
-  { value: 'undecided',   label: 'Belum tahu',             color: 'text-yellow-700 bg-yellow-50 border-yellow-300' },
-  { value: 'no',          label: 'Tidak bisa hadir',       color: 'text-red-600   bg-red-50   border-red-300' },
+  { value: 'yes',       label: 'Hadir',              color: 'text-green-700 bg-green-50 border-green-300' },
+  { value: 'undecided', label: 'Belum Tahu',          color: 'text-yellow-700 bg-yellow-50 border-yellow-300' },
+  { value: 'no',        label: 'Tidak Bisa Hadir',   color: 'text-red-600   bg-red-50   border-red-300' },
 ] as const;
+
+function toTitleCase(str: string): string {
+  return str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
 
 export default function Register() {
   const { user, profile, refreshProfile } = useAuth();
@@ -48,7 +51,7 @@ export default function Register() {
         .from('profiles')
         .upsert({
           id:                 user.id,
-          name:               form.name,
+          name:               toTitleCase(form.name),
           phone:              form.phone || null,
           city:               form.city,
           profession:         form.profession || null,

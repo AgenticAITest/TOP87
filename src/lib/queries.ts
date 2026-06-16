@@ -46,6 +46,8 @@ export const qk = {
   // Keringanan (financial assistance)
   myKeringanan:     (profileId: string)                     => ['keringanan', 'my', profileId]                as const,
   allKeringanan:    ()                                      => ['keringanan', 'all']                          as const,
+  // Payment summary report
+  paymentSummary:   (isSuperAdmin: boolean, ids: string[]) => ['admin', 'payment-summary', isSuperAdmin, ...ids] as const,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -226,20 +228,25 @@ export async function fetchMemberships(profileId: string) {
 export async function fetchApprovedMedia() {
   const { data, error } = await supabase
     .from('media')
-    .select('id, type, storage_path, external_url, caption, year_taken, created_at, charters(id, name), profiles!media_profile_id_fkey(id, name)')
+    .select('id, type, storage_path, external_url, caption, year_taken, created_at, tags, charters!media_charter_id_fkey(id, name), profiles!media_profile_id_fkey(id, name)')
     .eq('status', 'approved')
     .order('created_at', { ascending: false });
   must(data, error);
-  return (data ?? []).map((m: any) => ({
-    id: m.id, type: m.type as 'photo' | 'video',
-    storage_path: m.storage_path as string | null,
-    external_url: m.external_url as string | null,
-    caption: m.caption as string | null,
-    year_taken: m.year_taken as number | null,
-    created_at: m.created_at as string,
-    charter: m.charters as { id: string; name: string } | null,
-    profile: m.profiles as { id: string; name: string } | null,
-  }));
+  return (data ?? []).map((m: any) => {
+    const primaryCharter = m.charters as { id: string; name: string } | null;
+    return {
+      id: m.id, type: m.type as 'photo' | 'video',
+      storage_path: m.storage_path as string | null,
+      external_url: m.external_url as string | null,
+      caption: m.caption as string | null,
+      year_taken: m.year_taken as number | null,
+      created_at: m.created_at as string,
+      tags: (m.tags ?? []) as string[],
+      charter: primaryCharter,
+      allCharters: primaryCharter ? [primaryCharter] : [],
+      profile: m.profiles as { id: string; name: string } | null,
+    };
+  });
 }
 
 // ─── Admin fetchers ───────────────────────────────────────────────────────────
@@ -298,7 +305,7 @@ export async function fetchAdminMembers(isSuperAdmin: boolean, charterIds: strin
 export async function fetchAdminMedia(status: string, isSuperAdmin: boolean, charterIds: string[]) {
   let q = supabase
     .from('media')
-    .select('id, type, storage_path, external_url, caption, year_taken, status, created_at, charters(id, name), profiles!media_profile_id_fkey(id, name)')
+    .select('id, type, storage_path, external_url, caption, year_taken, status, created_at, tags, charters!media_charter_id_fkey(id, name), profiles!media_profile_id_fkey(id, name)')
     .eq('status', status)
     .order('created_at', { ascending: status === 'pending' });
   if (!isSuperAdmin && charterIds.length > 0) q = q.in('charter_id', charterIds);
@@ -312,6 +319,7 @@ export async function fetchAdminMedia(status: string, isSuperAdmin: boolean, cha
     year_taken: m.year_taken as number | null,
     status: m.status as string,
     created_at: m.created_at as string,
+    tags: (m.tags ?? []) as string[],
     charter: m.charters as { id: string; name: string } | null,
     profile: m.profiles as { id: string; name: string } | null,
   }));
@@ -346,11 +354,21 @@ export async function setFeaturedConfig(cfg: FeaturedConfig): Promise<void> {
 
 // ─── Phase 2 — Payments ───────────────────────────────────────────────────────
 
+export interface PaymentCredit {
+  id:          string;
+  payment_id:  string;
+  profile_id:  string;
+  credited_by: string | null;
+  created_at:  string;
+  profile?:    { name: string; avatar_url: string | null } | null;
+}
+
 export interface Payment {
   id:                    string;
   profile_id:            string;
   type:                  'reunion_fee' | 'donation';
   member_amount:         number;
+  donation_amount:       number;
   admin_adjusted_amount: number | null;
   receipt_url:           string | null;
   status:                'submitted' | 'pending_review' | 'confirmed' | 'bank_reconciled' | 'rejected';
@@ -361,6 +379,7 @@ export interface Payment {
   created_at:            string;
   updated_at:            string;
   profile?:              { name: string; avatar_url: string | null } | null;
+  credits?:              PaymentCredit[];
 }
 
 export interface QRISConfig {
@@ -382,7 +401,7 @@ export async function fetchQRISConfig(): Promise<QRISConfig> {
     qris_bank_name:    m['qris_bank_name']    ?? '',
     qris_account_no:   m['qris_account_no']   ?? '',
     qris_account_name: m['qris_account_name'] ?? '',
-    reunion_fee_target: parseInt(m['reunion_fee_target'] ?? '2017000', 10),
+    reunion_fee_target: parseInt(m['reunion_fee_target'] ?? '1870000', 10),
     donation_target:    parseInt(m['donation_target']    ?? '10000000', 10),
   };
 }
@@ -415,7 +434,7 @@ export async function fetchAdminPayments(
 
   let q = supabase
     .from('payments')
-    .select('*, profiles!payments_profile_id_fkey(name, avatar_url)')
+    .select('*, profiles!payments_profile_id_fkey(name, avatar_url), payment_credits(id, profile_id, credited_by, created_at, profiles!payment_credits_profile_id_fkey(name, avatar_url))')
     .order('created_at', { ascending: false });
 
   if (profileIds) q = q.in('profile_id', profileIds);
@@ -427,25 +446,55 @@ export async function fetchAdminPayments(
   return (data ?? []).map((r: any) => ({
     ...r,
     profile: r.profiles ?? null,
+    credits: (r.payment_credits ?? []).map((c: any) => ({ ...c, profile: c.profiles ?? null })),
   })) as Payment[];
 }
 
 export async function submitPayment(input: {
-  profileId:   string;
-  type:        'reunion_fee' | 'donation';
-  amount:      number;
-  receiptUrl:  string | null;
-  notes:       string | null;
+  profileId:      string;
+  type:           'reunion_fee' | 'donation';
+  amount:         number;
+  donationAmount: number;
+  receiptUrl:     string | null;
+  notes:          string | null;
 }): Promise<void> {
   const { error } = await supabase.from('payments').insert({
-    profile_id:   input.profileId,
-    type:         input.type,
-    member_amount: input.amount,
-    receipt_url:  input.receiptUrl,
-    member_notes: input.notes,
-    status:       'submitted',
+    profile_id:      input.profileId,
+    type:            input.type,
+    member_amount:   input.amount,
+    donation_amount: input.donationAmount,
+    receipt_url:     input.receiptUrl,
+    member_notes:    input.notes,
+    status:          'submitted',
   });
   if (error) throw error;
+}
+
+export async function assignPaymentCredits(
+  paymentId:  string,
+  profileIds: string[],
+  actorId:    string,
+): Promise<void> {
+  // Replace all existing credits for this payment
+  const { error: delErr } = await supabase
+    .from('payment_credits').delete().eq('payment_id', paymentId);
+  if (delErr) throw delErr;
+
+  if (profileIds.length > 0) {
+    const { error: insErr } = await supabase.from('payment_credits').insert(
+      profileIds.map(pid => ({ payment_id: paymentId, profile_id: pid, credited_by: actorId }))
+    );
+    if (insErr) throw insErr;
+  }
+
+  // Audit log — non-blocking (credits already saved above)
+  const { error: auditErr } = await supabase.from('audit_log').insert({
+    action:    'payment_credit_assigned',
+    actor_id:  actorId,
+    target_id: paymentId,
+    details:   { credited_to: profileIds },
+  });
+  if (auditErr) console.error('[audit_log] insert failed:', auditErr.message, auditErr.details);
 }
 
 export async function updatePaymentAdmin(
@@ -457,6 +506,248 @@ export async function updatePaymentAdmin(
     .update({ ...patch, reviewed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq('id', id);
   if (error) throw error;
+
+  // Audit log
+  const { error: auditErr } = await supabase.from('audit_log').insert({
+    action:    'payment_status_updated',
+    actor_id:  patch.reviewed_by ?? null,
+    target_id: id,
+    details:   { status: patch.status, admin_adjusted_amount: patch.admin_adjusted_amount ?? null },
+  });
+  if (auditErr) console.error('[audit_log] insert failed:', auditErr.message, auditErr.details);
+}
+
+export interface MemberPaymentSummary {
+  id:              string;
+  name:            string | null;
+  avatar_url:      string | null;
+  primaryCharter:  string | null;
+  iuranAmount:     number | null;   // null = belum bayar
+  iuranStatus:     string | null;   // 'confirmed'|'submitted'|'pending_review'|'rejected'|'credited'
+  iuranCreditedBy: string | null;   // payer name when status === 'credited'
+  donationTotal:   number;          // sum of confirmed donations
+}
+
+const IURAN_PRIORITY = ['confirmed', 'submitted', 'pending_review', 'rejected'];
+
+export async function fetchPaymentSummaryReport(
+  isSuperAdmin: boolean,
+  charterIds: string[],
+): Promise<MemberPaymentSummary[]> {
+  const profileIds = await charterScope(isSuperAdmin, charterIds);
+
+  const mq = supabase
+    .from('profiles')
+    .select('id, name, avatar_url, charter_members(is_primary, charters(name))')
+    .eq('status', 'approved')
+    .order('name');
+  const { data: members, error: mErr } = profileIds ? await mq.in('id', profileIds) : await mq;
+  must(members, mErr);
+
+  // Own payments (for status tracking — submitted/pending/rejected still shown)
+  const pq = supabase
+    .from('payments')
+    .select('id, profile_id, type, status, member_amount, admin_adjusted_amount');
+  const { data: payments } = profileIds ? await pq.in('profile_id', profileIds) : await pq;
+
+  // Ledger: iuran account balances from account_transactions
+  // Each row: account belongs to a member (profile_id NOT NULL), type = 'iuran'
+  // Sum of amounts = how much has been allocated to this member's iuran account
+  const { data: iuranTxns } = await supabase
+    .from('account_transactions')
+    .select('amount, payment_id, member_accounts!inner(profile_id, account_type), payments!inner(status, profiles!payments_profile_id_fkey(name))')
+    .eq('member_accounts.account_type', 'iuran')
+    .not('member_accounts.profile_id', 'is', null);
+
+  // Ledger: donation pool transactions
+  const { data: donTxns } = await supabase
+    .from('account_transactions')
+    .select('amount, payment_id, member_accounts!inner(profile_id, account_type), payments!inner(profile_id, status)')
+    .eq('member_accounts.account_type', 'donation')
+    .is('member_accounts.profile_id', null)
+    .eq('payments.status', 'confirmed');
+
+  // Build iuran ledger map: profile_id → { amount, payer_name | null }
+  // payer_name is non-null when someone else paid for this member
+  const iuranLedger = new Map<string, { amount: number; payerName: string | null }>();
+  for (const t of iuranTxns ?? []) {
+    const ma = (t as any).member_accounts;
+    const p  = (t as any).payments;
+    if (!ma?.profile_id) continue;
+    const existing = iuranLedger.get(ma.profile_id);
+    const amount   = existing ? existing.amount + (t.amount as number) : (t.amount as number);
+    // payerName = payer of the payment, but only meaningful when payer ≠ beneficiary
+    const payerName = p?.profiles?.name ?? null;
+    iuranLedger.set(ma.profile_id, { amount, payerName: existing?.payerName ?? payerName });
+  }
+
+  // Build donation map: payer profile_id → total donated via ledger pool entries
+  const donByProfile = new Map<string, number>();
+  for (const t of donTxns ?? []) {
+    const payerProfileId = (t as any).payments?.profile_id;
+    if (!payerProfileId) continue;
+    donByProfile.set(payerProfileId, (donByProfile.get(payerProfileId) ?? 0) + (t.amount as number));
+  }
+
+  // Group own payments by profile
+  const byProfile = new Map<string, any[]>();
+  for (const p of payments ?? []) {
+    if (!byProfile.has(p.profile_id)) byProfile.set(p.profile_id, []);
+    byProfile.get(p.profile_id)!.push(p);
+  }
+
+  return (members ?? []).map((m: any) => {
+    const primary = (m.charter_members ?? []).find((cm: any) => cm.is_primary);
+    const all     = byProfile.get(m.id) ?? [];
+
+    // Ledger-first: check if there are confirmed allocations for this member's iuran
+    const ledger = iuranLedger.get(m.id);
+
+    // Also check own submitted/pending payments (not yet allocated)
+    const iuranList = all.filter((p: any) => p.type === 'reunion_fee');
+    let bestOwn: any = null;
+    for (const s of IURAN_PRIORITY) {
+      bestOwn = iuranList.find((p: any) => p.status === s) ?? null;
+      if (bestOwn) break;
+    }
+
+    // Determine iuran status:
+    // 1. If ledger has entry → confirmed (credited by ledger allocation)
+    // 2. Else use best own payment status
+    let iuranStatus:     string | null = null;
+    let iuranAmount:     number | null = null;
+    let iuranCreditedBy: string | null = null;
+
+    if (ledger) {
+      iuranStatus = 'confirmed';
+      iuranAmount = ledger.amount;
+      // If there's no own confirmed payment but ledger exists → someone else paid
+      const hasOwnConfirmed = bestOwn?.status === 'confirmed';
+      if (!hasOwnConfirmed) {
+        iuranCreditedBy = ledger.payerName;
+        iuranStatus     = 'credited';
+      }
+    } else if (bestOwn) {
+      iuranStatus = bestOwn.status;
+      iuranAmount = bestOwn.admin_adjusted_amount ?? bestOwn.member_amount;
+    }
+
+    // Donation total: ledger pool entries (allocated portion of any payment)
+    // + standalone donation-type payments not yet in ledger
+    const ledgerDonation = donByProfile.get(m.id) ?? 0;
+    const standaloneDonation = all
+      .filter((p: any) => p.type === 'donation' && p.status === 'confirmed')
+      .reduce((sum: number, p: any) => sum + (p.admin_adjusted_amount ?? p.member_amount), 0);
+    const donationTotal = ledgerDonation + standaloneDonation;
+
+    return {
+      id:              m.id,
+      name:            m.name,
+      avatar_url:      m.avatar_url,
+      primaryCharter:  primary?.charters?.name ?? null,
+      iuranAmount,
+      iuranStatus,
+      iuranCreditedBy,
+      donationTotal,
+    };
+  });
+}
+
+// ─── Ledger: member_accounts + account_transactions ──────────────────────────
+
+export type AccountType = 'iuran' | 'donation' | 'merchandise';
+
+export interface LedgerAllocation {
+  profileId:   string | null;  // null = pool account
+  accountType: AccountType;
+  amount:      number;
+  note?:       string;
+}
+
+export interface LedgerEntry {
+  id:          string;
+  account_id:  string;
+  amount:      number;
+  payment_id:  string | null;
+  created_by:  string | null;
+  created_at:  string;
+  note:        string | null;
+  profile_id:  string | null;
+  accountType: AccountType;
+}
+
+async function getOrCreateMemberAccount(profileId: string | null, accountType: AccountType): Promise<string> {
+  let q = supabase.from('member_accounts').select('id').eq('account_type', accountType);
+  q = profileId ? (q as any).eq('profile_id', profileId) : (q as any).is('profile_id', null);
+  const { data: existing } = await q.maybeSingle();
+  if (existing) return (existing as any).id as string;
+
+  const { data, error } = await supabase
+    .from('member_accounts')
+    .insert({ profile_id: profileId, account_type: accountType })
+    .select('id')
+    .single();
+  if (error) throw error;
+  return (data as any).id as string;
+}
+
+export async function fetchPaymentAllocations(paymentId: string): Promise<LedgerEntry[]> {
+  const { data, error } = await supabase
+    .from('account_transactions')
+    .select('id, account_id, amount, payment_id, created_by, created_at, note, member_accounts(profile_id, account_type)')
+    .eq('payment_id', paymentId)
+    .order('created_at');
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    id:          r.id,
+    account_id:  r.account_id,
+    amount:      r.amount as number,
+    payment_id:  r.payment_id,
+    created_by:  r.created_by,
+    created_at:  r.created_at,
+    note:        r.note,
+    profile_id:  r.member_accounts?.profile_id ?? null,
+    accountType: r.member_accounts?.account_type as AccountType,
+  }));
+}
+
+export async function savePaymentAllocations(
+  paymentId:    string,
+  allocations:  LedgerAllocation[],
+  createdBy:    string,
+): Promise<void> {
+  // Resolve / create account IDs
+  const resolved = await Promise.all(
+    allocations.map(async a => ({
+      account_id: await getOrCreateMemberAccount(a.profileId, a.accountType),
+      amount:     a.amount,
+      payment_id: paymentId,
+      created_by: createdBy,
+      note:       a.note ?? null,
+    }))
+  );
+
+  // Replace existing transactions for this payment
+  const { error: delErr } = await supabase
+    .from('account_transactions')
+    .delete()
+    .eq('payment_id', paymentId);
+  if (delErr) throw delErr;
+
+  if (resolved.length > 0) {
+    const { error: insErr } = await supabase.from('account_transactions').insert(resolved);
+    if (insErr) throw insErr;
+  }
+
+  // Audit log (non-blocking)
+  supabase.from('audit_log').insert({
+    action:    'payment_allocated',
+    actor_id:  createdBy,
+    target_id: paymentId,
+    details:   { allocations: allocations.map(a => ({ type: a.accountType, amount: a.amount, for: a.profileId })) },
+  }).then(({ error }) => {
+    if (error) console.error('[audit_log] insert failed:', error.message);
+  });
 }
 
 export async function fetchPaymentTotals(): Promise<{ reunion_fee: number; donation: number }> {
@@ -506,13 +797,14 @@ export async function revokeFinanceAdmin(profileId: string): Promise<void> {
 export async function fetchConfirmedPayments(): Promise<Payment[]> {
   const { data, error } = await supabase
     .from('payments')
-    .select('*, profiles!payments_profile_id_fkey(name, avatar_url)')
+    .select('*, profiles!payments_profile_id_fkey(name, avatar_url), payment_credits(id, profile_id, credited_by, created_at, profiles!payment_credits_profile_id_fkey(name, avatar_url))')
     .in('status', ['confirmed', 'bank_reconciled'])
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data ?? []).map((r: any) => ({
     ...r,
-    profile: r.profiles ?? null,
+    profile:  r.profiles ?? null,
+    credits:  (r.payment_credits ?? []).map((c: any) => ({ ...c, profile: c.profiles ?? null })),
   })) as Payment[];
 }
 
@@ -769,24 +1061,38 @@ export interface MediaComment {
   media_id:   string;
   body:       string;
   created_at: string;
+  parent_id:  string | null;
   profile:    { id: string; name: string; avatar_url: string | null };
+  replies?:   MediaComment[];
 }
 
 export async function fetchComments(mediaId: string): Promise<MediaComment[]> {
   const { data } = await supabase
     .from('media_comments')
-    .select('id, media_id, body, created_at, profile:profiles(id, name, avatar_url)')
+    .select('id, media_id, body, created_at, parent_id, profile:profiles(id, name, avatar_url)')
     .eq('media_id', mediaId)
     .order('created_at', { ascending: true });
-  return (data ?? []) as unknown as MediaComment[];
+  const flat = (data ?? []) as unknown as MediaComment[];
+  // Build tree: top-level comments with replies nested
+  const map = new Map<string, MediaComment>();
+  flat.forEach(c => map.set(c.id, { ...c, replies: [] }));
+  const roots: MediaComment[] = [];
+  map.forEach(c => {
+    if (c.parent_id && map.has(c.parent_id)) {
+      map.get(c.parent_id)!.replies!.push(c);
+    } else {
+      roots.push(c);
+    }
+  });
+  return roots;
 }
 
-export async function addComment(mediaId: string, body: string): Promise<void> {
+export async function addComment(mediaId: string, body: string, parentId?: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
   const { error } = await supabase
     .from('media_comments')
-    .insert({ media_id: mediaId, profile_id: user.id, body: body.trim() });
+    .insert({ media_id: mediaId, profile_id: user.id, body: body.trim(), parent_id: parentId ?? null });
   if (error) throw error;
 }
 

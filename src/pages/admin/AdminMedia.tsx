@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Check, X, Play, ImageIcon, ExternalLink, MessageSquare } from 'lucide-react';
+import { Check, X, Play, ImageIcon, ExternalLink, MessageSquare, Tag } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -45,6 +45,7 @@ export default function AdminMedia() {
 
   const [filter,           setFilter]           = useState<StatusFilter>('pending');
   const [expandedComments, setExpandedComments] = useState<string | null>(null);
+  const [selectedTag,      setSelectedTag]      = useState('');
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: qk.adminMedia(filter, isSuperAdmin, charterIds),
@@ -65,6 +66,17 @@ export default function AdminMedia() {
       queryClient.invalidateQueries({ queryKey: qk.media('approved') });
     },
   });
+
+  const allTags = useMemo(() => {
+    const counts = new Map<string, number>();
+    items.forEach(m => m.tags.forEach(t => counts.set(t, (counts.get(t) ?? 0) + 1)));
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
+  }, [items]);
+
+  const filtered = useMemo(() =>
+    selectedTag ? items.filter(m => m.tags.includes(selectedTag)) : items,
+    [items, selectedTag]
+  );
 
   const tabs: StatusFilter[] = ['pending', 'approved', 'rejected'];
 
@@ -88,13 +100,33 @@ export default function AdminMedia() {
         ))}
       </div>
 
+      {/* Tag filter chips */}
+      {allTags.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap mb-5">
+          <Tag size={12} className="text-gray-500 shrink-0" />
+          {allTags.map(t => (
+            <button
+              key={t}
+              onClick={() => setSelectedTag(selectedTag === t ? '' : t)}
+              className={`text-[11px] font-semibold px-3 py-1 rounded-full border transition-all ${
+                selectedTag === t
+                  ? 'bg-gold/20 text-gold border-gold/40'
+                  : 'bg-white/5 text-gray-400 border-white/10 hover:border-gold/30 hover:text-white'
+              }`}
+            >
+              #{t}
+            </button>
+          ))}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="text-center py-24 text-gray-600 text-sm tracking-widest uppercase animate-pulse">Loading…</div>
-      ) : items.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="text-center py-24 text-gray-600 text-sm tracking-widest uppercase">No {filter} submissions.</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {items.map((item, i) => {
+          {filtered.map((item, i) => {
             const thumb = thumbUrl(item);
             return (
               <motion.div key={item.id}
@@ -138,6 +170,21 @@ export default function AdminMedia() {
                     {item.year_taken && <span className="text-gray-600"> · {item.year_taken}</span>}
                   </p>
                   <p className="text-[10px] text-gray-600 mt-0.5">{timeAgo(item.created_at)}</p>
+                  {item.tags.length > 0 && (
+                    <div className="flex gap-1 flex-wrap mt-1.5">
+                      {item.tags.map(t => (
+                        <button
+                          key={t}
+                          onClick={() => setSelectedTag(selectedTag === t ? '' : t)}
+                          className={`text-[9px] rounded-full px-2 py-0.5 transition-colors ${
+                            selectedTag === t ? 'bg-gold/20 text-gold' : 'bg-white/5 text-gray-500 hover:text-gold'
+                          }`}
+                        >
+                          #{t}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="mt-auto pt-4">
                     {item.status === 'pending' ? (

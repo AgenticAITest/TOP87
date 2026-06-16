@@ -614,41 +614,72 @@ INSERT INTO site_settings (key, value) VALUES ('budget_total_target', '247000000
 
 ---
 
+### 6.0 Design Decisions (locked before building)
+
+Three choices were evaluated and resolved during planning:
+
+**Decision 1 — Worker-in-front-of-R2 (not public bucket + separate Worker)**
+
+Two patterns were considered:
+- **Option A (chosen):** Worker at `media.top87.id/*` handles all requests. GETs stream objects from the private R2 bucket via the Workers R2 binding. POSTs handle authenticated uploads. R2 bucket stays private.
+- **Option B (rejected):** R2 bucket served as public at `media.top87.id`; upload Worker on a separate subdomain.
+
+Option A is chosen because registering a Worker route on `media.top87.id/*` intercepts all traffic — a public R2 bucket on the same domain would be bypassed and serve nothing. Keeping the bucket private also means all access is auditable through the Worker.
+
+**Decision 2 — Worker proxy uploads (not presigned URLs)**
+
+Presigned URLs were considered but rejected for two reasons:
+1. R2 presigned PUT URLs only work on the S3 API domain (`<account_id>.r2.cloudflarestorage.com`), not on the custom domain `media.top87.id`. This would expose an unbranded S3 endpoint in client code and requires separate CORS configuration on the bucket.
+2. Generating presigned URLs requires AWS SigV4 credentials in the Worker (an extra dependency and extra round-trip).
+
+The simpler approach: the Worker accepts the file upload directly (`POST /upload`) and streams `request.body` into the R2 bucket via the native Workers R2 binding (`env.TOP87_MEDIA.put(key, request.body)`). The browser POSTs once, the Worker proxies to R2, returns the final `https://media.top87.id/{path}` URL. XHR `upload.onprogress` still works.
+
+**Decision 3 — No image resizing in Phase 6**
+
+Cloudflare Image Transformations (on-the-fly resize via `cf.image` or URL parameters) requires a **paid Cloudflare zone plan (Pro, $20/month minimum)**. There is no free Worker workaround. At 122 members, serving full-resolution images is acceptable — CSS `object-cover` handles cropping in the UI. Image resizing is deferred as a future paid add-on if gallery load times become a real problem post-launch.
+
+---
+
 ### 6.1 Architecture Overview
 
 ```
 Browser
   │
-  ├─ React SPA (static files) ──► Cloudflare Pages  [global CDN, auto-scaling]
+  ├─ React SPA (static files) ──► Cloudflare Pages     [global CDN, free tier]
   │
-  ├─ API calls ─────────────────► Supabase           [auth, DB, RLS — unchanged]
+  ├─ Auth / DB / RLS ───────────► Supabase              [unchanged]
   │
-  └─ Media (images / videos) ───► Cloudflare R2      [zero-egress object storage]
-                                      │
-                                  Custom domain
-                               media.top87.id
-                                      │
-                               Cloudflare CDN         [edge cache, image resize]
+  └─ Media reads + uploads ─────► Worker: media.top87.id/*
+                                       │
+                                       │  Workers R2 binding
+                                       ▼
+                                  R2 bucket: top87-media  [private]
+                                       │
+                              GET /{key}   → stream object, set Cache-Control header
+                              POST /upload → validate Supabase JWT → bucket.put()
 ```
 
-- **R2** replaces Supabase Storage and the VPS upload endpoint as the sole media backend.
-- **Cloudflare Pages** replaces Hostinger for the React SPA — automatic global distribution, no config needed for scaling.
-- **Cloudflare Worker** (`media-worker`) handles authenticated uploads (generates presigned R2 upload URLs) and serves as the edge cache policy layer.
+- **R2 bucket is private** — no public bucket access. All reads and writes go through the Worker.
+- **Worker sets Cache-Control per path prefix**: `public, max-age=31536000, immutable` for `/media/*`; `no-cache, must-revalidate` for `/cms/*` (CMS images can be replaced by admins).
+- **Cloudflare Pages** replaces Hostinger for the React SPA — git-integrated CI/CD, global distribution, free tier (500 deploys/month, unlimited requests).
 - **`storage_backend = 'r2'`** added to the existing toggle in `site_settings`; `storage.ts` is extended, not rewritten.
+- **Image resizing deferred** — full-size images served; CSS handles display cropping.
 
 ---
 
 ### 6.2 Infrastructure Setup
 
-- [ ] Create R2 bucket `top87-media` with public access enabled via custom domain `media.top87.id`
-- [ ] Point `media.top87.id` DNS to R2 bucket via Cloudflare (CNAME to R2 public endpoint)
-- [ ] Configure Cache-Control defaults on R2 objects: `public, max-age=31536000, immutable` for media files; `no-cache` for CMS images that may be replaced
-- [ ] Create Cloudflare Worker `top87-media-worker`:
-  - `POST /upload` — validates Supabase JWT, generates R2 presigned upload URL, returns it to client
-  - `GET /resize/:path?w=&h=&q=` — proxies R2 object through Cloudflare Images transform (on-the-fly resize for gallery thumbnails and directory avatars)
-  - Add Worker route: `media.top87.id/*`
-- [ ] Enable Cloudflare WAF rate-limiting rule: max 200 req/10s per IP on `/upload`
-- [ ] Set up Cloudflare Pages project pointing to the `dist/` output of this repo; configure build command `npm run build` and environment variables from `.env.local`
+- [ ] Create R2 bucket `top87-media` — **private** (do NOT enable public access)
+- [ ] Create Cloudflare Worker `top87-media-worker` with wrangler, bind to `top87-media` bucket:
+  - `GET /{key}` — fetch object from R2 binding, stream as response; set `Cache-Control: public, max-age=31536000, immutable` for paths under `/media/`; set `Cache-Control: no-cache, must-revalidate` for paths under `/cms/`
+  - `POST /upload` — validate `Authorization: Bearer <supabase_jwt>` header against Supabase JWT secret; derive `key` from `userId` + timestamp + file extension; call `env.TOP87_MEDIA.put(key, request.body, { httpMetadata: { contentType } })`; return `{ url: 'https://media.top87.id/{key}' }`
+  - `OPTIONS /*` — CORS preflight handler (allow origin `https://top87.id`, methods GET/POST/OPTIONS)
+  - Worker route: `media.top87.id/*`
+- [ ] Point `media.top87.id` DNS to the Worker (Cloudflare Workers route, not CNAME to R2 endpoint)
+- [ ] Enable Cloudflare WAF rate-limiting rule: max 200 req/10s per IP on `POST /upload` (available on free plan)
+- [ ] Set up Cloudflare Pages project:
+  - Connect to this GitHub repo; build command `npm run build`; output directory `dist`
+  - Configure environment variables in the Cloudflare Pages dashboard (not from `.env.local` — that file is local only): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `GEMINI_API_KEY`
 
 ---
 
@@ -657,10 +688,10 @@ Browser
 Current backends: `'supabase'` | `'vps'`
 New backend added: `'r2'`
 
-- [ ] Add `uploadToR2(file, path)` — calls `media.top87.id/upload` (Worker endpoint) to get a presigned URL, then PUTs the file directly from the browser to R2. Returns the full `https://media.top87.id/{path}` URL.
-- [ ] Update `resolveMediaUrl(storagePath)` — R2 URLs are already full `https://` URLs; existing passthrough logic handles them without change. No breaking changes.
-- [ ] Update `uploadFile(file, path)` dispatcher — add `case 'r2': return uploadToR2(file, path)`
-- [ ] Add `getResizedUrl(url, width, height)` utility — rewrites R2 URLs through the Worker resize endpoint for use in thumbnails; no-ops for non-R2 URLs
+- [ ] Add `uploadToR2(file, userId, onProgress?)` — POSTs the file directly to `https://media.top87.id/upload` with `Authorization: Bearer <supabase_jwt>` header using XHR (so `upload.onprogress` works). Returns the full `https://media.top87.id/{key}` URL from the Worker response.
+- [ ] Update `resolveMediaUrl(storagePath)` — R2 URLs are already full `https://` URLs; the existing `startsWith('https://')` passthrough handles them without change. **No breaking changes.**
+- [ ] Update `uploadFile(file, userId, onProgress?)` dispatcher — add `case 'r2': return uploadToR2(file, userId, onProgress)`
+- [ ] **No `getResizedUrl` utility** — image resizing deferred (see Decision 3 in 6.0). Gallery and avatar display uses existing CSS `object-cover`.
 
 ---
 
@@ -669,48 +700,48 @@ New backend added: `'r2'`
 | Key | Value | Notes |
 |---|---|---|
 | `storage_backend` | `'r2'` | Flipped from `'vps'` or `'supabase'` |
-| `r2_worker_url` | `https://media.top87.id` | Worker base URL (configurable in case domain changes) |
-| `cdn_resize_enabled` | `true` / `false` | Toggle Cloudflare Image resizing |
+| `r2_worker_url` | `https://media.top87.id` | Worker base URL; configurable in case domain changes |
 
-- [ ] `SiteAdmin.tsx` — add R2 section: Worker URL field, CDN resize toggle, current backend indicator with a live upload test button (uploads a 1px test file and confirms the URL resolves)
+- Removed: `cdn_resize_enabled` — image resizing not implemented in this phase.
+- [ ] `SiteAdmin.tsx` — add R2 section: Worker URL field, current backend indicator, live upload test button (uploads a 1 KB test file and confirms the returned URL resolves with a 200 response)
 
 ---
 
 ### 6.5 Media Migration Script
 
-All existing media rows in the `media` table have `storage_path` values pointing to either Supabase Storage or the VPS. Since this is pre-launch with test data only, migration is a one-time bulk copy rather than a live migration.
+All existing `media` rows have `storage_path` values pointing to either Supabase Storage or the VPS. Since this is pre-launch test data, migration is a one-time bulk copy rather than a live migration.
 
 - [ ] Node.js script `scripts/migrate-to-r2.js`:
-  1. Query all `media` rows from Supabase
-  2. For each row: download the file from its current backend (`resolveMediaUrl`), upload to R2 at the same path, update `media.storage_path` to the new `https://media.top87.id/...` URL
+  1. Query all `media` rows via Supabase REST API (`node-fetch` — **cannot import `storage.ts`** which is a TypeScript frontend module; the script implements its own fetch logic using the Supabase REST API and `https.get` for file downloads)
+  2. For each row: download from current URL; upload to Worker `POST /upload` endpoint; update `media.storage_path` to the new `https://media.top87.id/...` URL
   3. Log successes and failures; produce a summary CSV
-  4. Dry-run mode (`--dry-run`) that lists what would be moved without touching anything
-- [ ] CMS images (`cms_content` rows where `content_type = 'image_url'`) — same script covers them via a second pass over `cms_content`
-- [ ] After migration: verify 10 random media items load correctly, then flip `storage_backend` to `'r2'` in `site_settings`
+  4. Dry-run mode (`--dry-run`) lists what would be moved without touching anything
+- [ ] Second pass: CMS images (`cms_content` rows where `content_type = 'image_url'`) — same download → upload → update pattern
+- [ ] After migration: spot-check 10 random media items load correctly, then flip `storage_backend` to `'r2'` in `site_settings`
 
-> **Note:** Since all current data is test data, this script can be run destructively (no rollback needed). For production, run in dry-run first.
+> **Note:** All current data is test data — the script can be run destructively (no rollback needed). Always run `--dry-run` first regardless.
 
 ---
 
 ### 6.6 Frontend / Admin Tasks
 
-- [ ] `Gallery.tsx` — use `getResizedUrl(url, 400, 300)` for thumbnails; full URL for expanded view
-- [ ] `MemberProfile.tsx` + `Directory.tsx` — use `getResizedUrl(url, 128, 128)` for avatars
 - [ ] `AdminMedia.tsx` — upload path updated automatically via `storage.ts` dispatcher; no UI change needed
 - [ ] `SubmitMedia.tsx` — same; upload path update is transparent
+- [ ] `Gallery.tsx` — no changes needed; `resolveMediaUrl` already handles full `https://` URLs; CSS `object-cover` handles cropping
+- [ ] `MemberProfile.tsx` + `Directory.tsx` — no changes needed; avatars display correctly with CSS sizing
 - [ ] `SiteAdmin.tsx` — R2 config section (see 6.4)
-- [ ] `App.tsx` / deploy config — add Cloudflare Pages deployment target to README (build command, env vars)
+- [ ] Cloudflare Pages deploy config — environment variables set in Cloudflare Pages dashboard; document variable names in README
 
 ---
 
 ### 6.7 Spike Traffic Strategy
 
-Cloudflare's network handles the traffic amplification layer. No application code changes are needed for scaling beyond what's listed — this is configuration only.
+Cloudflare's network handles the traffic amplification layer. No application code changes needed beyond what's listed — this is configuration only.
 
 | Concern | Solution |
 |---|---|
 | React SPA traffic spike | Cloudflare Pages serves static files from 300+ PoPs; scales to any load automatically |
-| Media CDN cache miss storm | R2 + Cloudflare CDN; cache hit ratio approaches 100% after first request per edge node |
+| Media CDN cache miss storm | Worker sets long-lived Cache-Control; Cloudflare edge caches responses — cache hit ratio approaches 100% after first request per edge node |
 | Gallery page hammering DB | Existing TanStack Query `staleTime` caching; add `staleTime: 5 * 60_000` to `qk.media` queries for approved members |
 | Upload burst (event day) | Worker rate limiting (6.2) + Supabase connection pool (already active) |
 | DDoS / bot traffic | Cloudflare's automatic DDoS mitigation (free tier); no additional config |
@@ -722,23 +753,25 @@ Cloudflare's network handles the traffic amplification layer. No application cod
 
 | Resource | Before | After |
 |---|---|---|
-| Media storage | Hostinger plan limit + Supabase 1 GB free | R2: $0.015/GB/month, effectively free at launch scale |
-| Media egress | Hostinger bandwidth cap | R2: **$0 egress** (Cloudflare network) |
-| CDN | None | Cloudflare free tier: unlimited CDN bandwidth |
-| SPA hosting | Hostinger shared plan | Cloudflare Pages free tier: unlimited requests |
-| Image resizing | None | Cloudflare Images: $5/100k transformations (or use free `cf-resize` Worker approach) |
+| Media storage | Hostinger plan limit + Supabase 1 GB free | R2: $0.015/GB/month; **10 GB free tier** — effectively $0 at launch scale |
+| Media egress | Hostinger bandwidth cap | R2 → Cloudflare network: **$0 egress** |
+| CDN | None | Cloudflare edge cache (included in Worker free tier): unlimited bandwidth |
+| SPA hosting | Hostinger shared plan | Cloudflare Pages free tier: 500 deploys/month, unlimited requests |
+| Worker | N/A | Cloudflare Workers free tier: 100k req/day — sufficient for this scale |
+| Image resizing | N/A | **Deferred** — requires Cloudflare Pro zone ($20/month); not cost-justified at 122 members |
 
 ---
 
 ### 6.9 Exit Criteria
 
-- All media uploaded after go-live lands in R2 and is served from `media.top87.id`
-- Migration script has run; all pre-existing test media accessible via new R2 URLs
-- Gallery thumbnails and member avatars load via Worker resize endpoint
-- `SiteAdmin.tsx` R2 config section live; test upload button confirms Worker is reachable
-- Cloudflare Pages deployment live; Hostinger retained only as a fallback/DNS holder
+- All media uploaded after go-live lands in R2 and is served from `media.top87.id` through the Worker
+- Worker correctly streams R2 objects for GET requests with appropriate Cache-Control headers per path prefix
+- Worker correctly validates Supabase JWT on POST /upload and rejects unauthenticated requests
+- Migration script has run in dry-run and then live; all pre-existing test media accessible via new R2 URLs
+- `SiteAdmin.tsx` R2 config section live; test upload button confirms Worker is reachable and returns a valid URL
+- Cloudflare Pages deployment live; Hostinger retained only as DNS fallback
 - No egress charges on R2 after 30 days of operation (verify in Cloudflare dashboard)
-- Rate limiting rule confirmed blocking burst uploads in a load test
+- Rate limiting rule confirmed active on `POST /upload`
 
 ---
 
@@ -987,6 +1020,180 @@ CREATE POLICY "charter_members_superadmin_all"
 
 ---
 
+## Phase 8 — Media Enrichment: Tags, Multi-Charter & Threaded Comments
+**Goal:** Make media more discoverable and contextually rich. Mandatory human-provided tags replace AI tagging (dropped — not cost-justified when tags are required at upload). Photos and videos can belong to multiple charters. Comments gain one level of replies.
+
+> **AI tagging explicitly dropped.** Gemini auto-tagging would cost real money at thousands of images and adds operational complexity. Human-provided tags at upload time are mandatory — this covers the same searchability goal at zero ongoing cost.
+
+---
+
+### 8.1 Database Changes
+
+```sql
+-- ── media table ──────────────────────────────────────────────────────────────
+
+-- 1. Mandatory human tags (min 1 required)
+ALTER TABLE media
+  ADD COLUMN tags TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE media
+  ADD CONSTRAINT media_tags_min_one CHECK (cardinality(tags) >= 1);
+
+-- 2. Full-text search index on caption + tags (no AI columns)
+ALTER TABLE media
+  ADD COLUMN search_vector TSVECTOR
+    GENERATED ALWAYS AS (
+      to_tsvector('indonesian',
+        coalesce(caption, '') || ' ' ||
+        coalesce(array_to_string(tags, ' '), '')
+      )
+    ) STORED;
+
+CREATE INDEX media_search_idx ON media USING GIN(search_vector);
+
+-- 3. Drop single-charter FK (test data only — no migration needed)
+ALTER TABLE media DROP COLUMN IF EXISTS charter_id;
+
+-- ── multi-charter junction ────────────────────────────────────────────────────
+
+CREATE TABLE media_charters (
+  media_id   UUID NOT NULL REFERENCES media(id) ON DELETE CASCADE,
+  charter_id UUID NOT NULL REFERENCES charters(id) ON DELETE CASCADE,
+  PRIMARY KEY (media_id, charter_id)
+);
+
+CREATE INDEX media_charters_charter_idx ON media_charters(charter_id);
+
+-- RLS: members SELECT only; charter admins SELECT within their charter;
+--      super admins full CRUD; uploader manages their own media's charters
+-- (add RLS policies in migration file)
+
+-- ── threaded comments (1 level) ──────────────────────────────────────────────
+
+ALTER TABLE media_comments
+  ADD COLUMN parent_id UUID REFERENCES media_comments(id) ON DELETE CASCADE;
+
+-- App layer enforces max depth = 1: replies cannot themselves be replied to.
+-- Top-level: parent_id IS NULL
+-- Reply:     parent_id = <comment id>
+```
+
+---
+
+### 8.2 Batch Upload UX (`SubmitMedia.tsx`)
+
+Current: single file, single caption. Updated flow:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Select files (multiple)                            │
+│  ┌────────────────────────────────────────────┐     │
+│  │ 📷 photo1.jpg   [Caption... optional]      │     │
+│  │ 📷 photo2.jpg   [Caption... optional]      │     │
+│  │ 🎬 video1.mp4   [Caption... optional]      │     │
+│  └────────────────────────────────────────────┘     │
+│                                                     │
+│  Tags *  (shared, applies to all files above)       │
+│  [ reuni ] [ bandung ] [ 1987 ] [ + Add tag ]       │
+│  ↑ minimum 1 tag required                           │
+│                                                     │
+│  Charters *  (shared)                               │
+│  ☑ Bandung  ☑ Jakarta  ☐ Australia  ☐ USA          │
+│  ↑ minimum 1 charter required                       │
+│                                                     │
+│  [ Upload All ]                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+On submit: creates one `media` row per file (with shared `tags`), then inserts one `media_charters` row per file × charter combination.
+
+---
+
+### 8.3 Frontend Tasks
+
+**`SubmitMedia.tsx`**
+- [ ] Multi-file selector (already may exist — extend to show per-file caption inputs)
+- [ ] Tag input: free-form pill/chip UI; enforce min 1 before enabling submit; stored as `TEXT[]`
+- [ ] Charter multi-select: checkboxes from `fetchCharters()`; enforce min 1
+- [ ] On submit: for each file, `INSERT media` with `tags`; then `INSERT media_charters` rows for selected charters
+
+**`Gallery.tsx`**
+- [ ] Search bar: free-text query using `search_vector @@ websearch_to_tsquery('indonesian', q)` — searches caption + tags simultaneously
+- [ ] Tag filter chips: clicking a tag filters by `'tag' = ANY(tags)` (exact match, like hashtags)
+- [ ] Charter filter: filter media via `media_charters` JOIN instead of `media.charter_id`
+- [ ] Display tags on media cards/lightbox
+
+**`MediaComments.tsx`**
+- [ ] Render replies indented under their parent comment
+- [ ] "Balas" (Reply) button on top-level comments; opens inline reply form
+- [ ] Reply form submits with `parent_id` set; no "Balas" button on replies (max 1 level)
+- [ ] Fetch query: `SELECT * FROM media_comments WHERE media_id = $1 ORDER BY COALESCE(parent_id, id), created_at` — groups replies under parents in a single query; frontend groups into two-tier structure
+
+**`AdminMedia.tsx`**
+- [ ] Show tags on media cards
+- [ ] Filter/search by tag
+- [ ] Queries updated to JOIN `media_charters` (see queries.ts below)
+
+**`queries.ts`**
+- [ ] `fetchMedia(charterId?)` — JOIN `media_charters` for charter filtering; add `tags` to SELECT
+- [ ] `fetchAdminMedia(isSuperAdmin, charterIds)` — `charterScope` updated to filter via `media_charters` JOIN instead of `media.charter_id`
+- [ ] `submitMedia(files, tags, charterIds, captions)` — batch insert: one `media` row per file, then `media_charters` rows
+- [ ] `fetchComments(mediaId)` — already exists; ensure `parent_id` is included in SELECT
+- [ ] `addComment(mediaId, body, parentId?)` — add optional `parent_id` parameter
+- [ ] `searchMedia(query)` — `search_vector @@ websearch_to_tsquery('indonesian', query)` with `status = 'approved'` filter
+- [ ] `qk` factory — add `qk.mediaSearch(query)`
+
+---
+
+### 8.4 RLS Policies
+
+```sql
+-- media_charters: same scoping rules as media
+-- Members: SELECT where media is approved
+CREATE POLICY "media_charters_member_select"
+  ON media_charters FOR SELECT
+  USING (
+    EXISTS (SELECT 1 FROM media WHERE id = media_id AND status = 'approved')
+    AND EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND status = 'approved')
+  );
+
+-- Charter admins: SELECT within their charters
+CREATE POLICY "media_charters_charter_admin_select"
+  ON media_charters FOR SELECT
+  USING (
+    EXISTS (SELECT 1 FROM charter_admins
+            WHERE profile_id = auth.uid() AND charter_id = media_charters.charter_id)
+  );
+
+-- Super admins: full CRUD
+CREATE POLICY "media_charters_superadmin_all"
+  ON media_charters FOR ALL
+  USING (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_super_admin = true)
+  );
+
+-- Uploaders: manage charters for their own media
+CREATE POLICY "media_charters_owner_all"
+  ON media_charters FOR ALL
+  USING (
+    EXISTS (SELECT 1 FROM media WHERE id = media_id AND profile_id = auth.uid())
+  );
+```
+
+---
+
+### 8.5 Exit Criteria
+
+- Uploading a photo or video without at least 1 tag is blocked at the form level
+- Batch upload assigns shared tags and selected charters to all files in one submission
+- A photo assigned to Charter Bandung and Charter Jakarta appears in both charters' gallery views
+- Gallery search bar finds photos by caption text and by tag
+- Clicking a tag chip filters the gallery to only photos with that tag
+- Replies to comments render indented under the parent comment
+- Replying to a reply is not possible (UI hides "Balas" on replies)
+- All `media` queries use `media_charters` JOIN; no code references `media.charter_id`
+
+---
+
 ## Phase Summary Table
 
 | Phase | Status | Features | New Tables | Effort | Depends On |
@@ -998,9 +1205,10 @@ CREATE POLICY "charter_members_superadmin_all"
 | **4** | ✅ Complete | Gallery comments + lightbox navigation, countdown widgets, attendance label fix | `media_comments` | Low–Medium | Phase 2 + 3 |
 | **4b** | ✅ Complete | Admin Financial Report (unified view, multi-filter), Help Modal (role-aware in-app user manual) | — | Low–Medium | Phase 3 |
 | **5** | ⬜ Pending | WhatsApp daily status bot | — (site_settings keys) | High (separate service) | Phase 4 |
-| **6** | ⬜ Pending | Cloudflare R2 storage, CDN, image resizing, Cloudflare Pages deploy, spike-traffic hardening | — (site_settings keys) | Medium (infra-heavy) | Phase 5 |
+| **6** | ⬜ Pending | Cloudflare R2 storage (Worker-proxy pattern), Cloudflare Pages deploy, spike-traffic hardening; image resizing deferred | — (site_settings keys) | Medium (infra-heavy) | Phase 4 (independent of Phase 5) |
 | **7.1** | ✅ Complete | Light/dark theme toggle | — | Low | Phase 0 |
 | **7.2** | ✅ Complete | Finance Admin role (bank rekon only) | `finance_admins` | Low–Medium | Phase 2 |
 | **7.3** | ✅ Complete | Charter management UI | — (+ `is_active` column) | Medium | Phase 0 |
 | **7.4** | ✅ Complete | Admin panel backdrop image + upload | — (site_settings keys) | Low | Phase 0 |
 | **7** | ✅ **PHASE COMPLETE** | All four sub-features delivered | `finance_admins` | — | — |
+| **8** | ⬜ Pending | Mandatory tags, multi-charter media, batch upload UX, threaded comments (1 level), gallery full-text search; AI tagging dropped | `media_charters` + columns on `media`, `media_comments` | Medium | Phase 4 |

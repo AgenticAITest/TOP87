@@ -35,9 +35,12 @@ export default function QRISModal({ type, onClose, onSuccess }: Props) {
   const [error,       setError]       = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const amount      = parseRp(amountRaw);
+  const FEE_AMOUNT  = 1_870_000;
+  const amount       = parseRp(amountRaw);
   const suggestedAmt = type === 'reunion_fee' ? (qris?.reunion_fee_target ?? 0) : 0;
-  const typeLabel   = type === 'reunion_fee' ? 'Iuran Reuni' : 'Donasi';
+  const typeLabel    = type === 'reunion_fee' ? 'Iuran Reuni' : 'Donasi';
+  const isSplit      = type === 'reunion_fee' && amount > FEE_AMOUNT;
+  const donationAmt  = isSplit ? amount - FEE_AMOUNT : 0;
 
   async function handleSubmit() {
     if (!user || !profile) return;
@@ -50,11 +53,12 @@ export default function QRISModal({ type, onClose, onSuccess }: Props) {
         receiptUrl = await uploadReceipt(receiptFile, user.id);
       }
       await submitPayment({
-        profileId:  profile.id,
+        profileId:      profile.id,
         type,
         amount,
+        donationAmount: donationAmt,
         receiptUrl,
-        notes:      notes.trim() || null,
+        notes:          notes.trim() || null,
       });
       setSubmitted(true);
       setTimeout(() => { onSuccess?.(); onClose(); }, 2000);
@@ -156,6 +160,23 @@ export default function QRISModal({ type, onClose, onSuccess }: Props) {
                     Isi otomatis {formatRp(suggestedAmt)}
                   </button>
                 )}
+                {/* Split breakdown when amount exceeds fee */}
+                {isSplit && (
+                  <div className="mt-2 bg-white/5 border border-white/10 rounded-xl p-3 space-y-1 text-xs">
+                    <div className="flex justify-between text-gray-400">
+                      <span>Iuran</span>
+                      <span className="text-green-400 font-semibold">{formatRp(FEE_AMOUNT)}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-400">
+                      <span>Donasi</span>
+                      <span className="text-blue-400 font-semibold">{formatRp(donationAmt)}</span>
+                    </div>
+                    <div className="border-t border-white/10 pt-1 flex justify-between text-gray-300 font-semibold">
+                      <span>Total</span>
+                      <span>{formatRp(amount)}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Receipt upload */}
@@ -188,7 +209,7 @@ export default function QRISModal({ type, onClose, onSuccess }: Props) {
                 <textarea
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
-                  placeholder="Misal: transfer cicilan ke-1"
+                  placeholder="Contoh: bayar untuk Budi Santoso - Jakarta, sisanya donasi"
                   rows={2}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors resize-none"
                 />
