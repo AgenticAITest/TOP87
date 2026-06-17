@@ -208,7 +208,7 @@ export default function PublicLanding() {
               >
                 Foto Angkatan
               </div>
-              <p className="mt-2 text-center text-[9px] uppercase tracking-widest text-gray-400">Koridor SMA, 1986</p>
+              <p className="mt-2 text-center text-[9px] uppercase tracking-widest text-gray-400">Koridor, 1986</p>
             </div>
             <div className="rotate-3 bg-white p-3 shadow-xl border border-amber-200/60 shrink-0 mt-10">
               <div
@@ -288,7 +288,7 @@ export default function PublicLanding() {
       <footer className="bg-forest border-t border-white/5 py-10">
         <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-white/40 text-xs">
           <span className="font-serif font-bold text-gold text-base">TOP87</span>
-          <p>SMA Negeri 3 Bandung · Angkatan 1987</p>
+          <p>St. Aloysius Bandung · Angkatan 1987</p>
           <p className="italic">Dari kita, oleh kita, untuk kita.</p>
         </div>
       </footer>
