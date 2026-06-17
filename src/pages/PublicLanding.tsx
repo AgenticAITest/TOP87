@@ -55,11 +55,14 @@ export default function PublicLanding() {
 
   if (!loading && user) return <Navigate to="/home" replace />;
 
-  const heroTitle   = cms?.['hero.title']       ?? 'Sekarang Aku Menjadi Dewasa';
-  const heroBgUrl   = cms?.['hero.image_url']   ?? DEFAULT_HERO_BG;
-  const reunionIso  = cms?.['reunion.date_iso'] ?? DEFAULT_REUNION_ISO;
-  const venue       = cms?.['reunion.venue']    ?? 'Bandung / Ciwidey';
-  const quotaTarget = parseInt(cms?.['kpi.quota'] ?? String(DEFAULT_QUOTA), 10);
+  const heroTitle       = cms?.['hero.title']              ?? 'Sekarang Aku Menjadi Dewasa';
+  const heroBgUrl       = cms?.['hero.image_url']          ?? DEFAULT_HERO_BG;
+  const reunionIso      = cms?.['reunion.date_iso']        ?? DEFAULT_REUNION_ISO;
+  const venue           = cms?.['reunion.venue']           ?? 'Bandung / Ciwidey';
+  const quotaTarget     = parseInt(cms?.['kpi.quota']      ?? String(DEFAULT_QUOTA), 10);
+  const photo1Caption   = cms?.['nostalgia.photo1_caption'] ?? 'Koridor, 1986';
+  const photo2Caption   = cms?.['nostalgia.photo2_caption'] ?? 'Wisuda, 1987';
+  const footerSchoolLine = cms?.['footer.school_line']     ?? 'St. Aloysius Bandung · Angkatan 1987';
 
   const approvedCount = dashboard?.approvedCount ?? 0;
   const remaining     = Math.max(0, quotaTarget - approvedCount);
@@ -208,7 +211,7 @@ export default function PublicLanding() {
               >
                 Foto Angkatan
               </div>
-              <p className="mt-2 text-center text-[9px] uppercase tracking-widest text-gray-400">Koridor, 1986</p>
+              <p className="mt-2 text-center text-[9px] uppercase tracking-widest text-gray-400">{photo1Caption}</p>
             </div>
             <div className="rotate-3 bg-white p-3 shadow-xl border border-amber-200/60 shrink-0 mt-10">
               <div
@@ -217,7 +220,7 @@ export default function PublicLanding() {
               >
                 Foto Wisuda
               </div>
-              <p className="mt-2 text-center text-[9px] uppercase tracking-widest text-gray-400">Wisuda, 1987</p>
+              <p className="mt-2 text-center text-[9px] uppercase tracking-widest text-gray-400">{photo2Caption}</p>
             </div>
           </div>
         </div>
@@ -288,7 +291,7 @@ export default function PublicLanding() {
       <footer className="bg-forest border-t border-white/5 py-10">
         <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-white/40 text-xs">
           <span className="font-serif font-bold text-gold text-base">TOP87</span>
-          <p>St. Aloysius Bandung · Angkatan 1987</p>
+          {footerSchoolLine && <p>{footerSchoolLine}</p>}
           <p className="italic">Dari kita, oleh kita, untuk kita.</p>
         </div>
       </footer>

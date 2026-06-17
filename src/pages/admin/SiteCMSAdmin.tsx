@@ -61,6 +61,19 @@ const PAGES: Record<string, PageDef> = {
           date_iso: { label: 'Reunion start date (ISO 8601)', type: 'text', hint: 'e.g. 2027-04-29T17:00:00+07:00 — drives the countdown clock.' },
         },
       },
+      nostalgia: {
+        label: 'Nostalgia Section',
+        fields: {
+          photo1_caption: { label: 'Photo 1 caption', type: 'text', hint: 'Caption below the first photo placeholder, e.g. "Koridor, 1986"' },
+          photo2_caption: { label: 'Photo 2 caption', type: 'text', hint: 'Caption below the second photo placeholder, e.g. "Wisuda, 1987"' },
+        },
+      },
+      footer: {
+        label: 'Footer',
+        fields: {
+          school_line: { label: 'School / class line', type: 'text', hint: 'Shown in the public footer, e.g. "St. Aloysius Bandung · Angkatan 1987". Leave blank to hide.' },
+        },
+      },
     },
   },
   anggaran: {
