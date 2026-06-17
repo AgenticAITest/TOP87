@@ -60,8 +60,10 @@ export default function PublicLanding() {
   const reunionIso      = cms?.['reunion.date_iso']        ?? DEFAULT_REUNION_ISO;
   const venue           = cms?.['reunion.venue']           ?? 'Bandung / Ciwidey';
   const quotaTarget     = parseInt(cms?.['kpi.quota']      ?? String(DEFAULT_QUOTA), 10);
-  const photo1Caption   = cms?.['nostalgia.photo1_caption'] ?? 'Koridor, 1986';
-  const photo2Caption   = cms?.['nostalgia.photo2_caption'] ?? 'Wisuda, 1987';
+  const photo1Url     = cms?.['nostalgia.photo1_url']     ?? '';
+  const photo1Caption = cms?.['nostalgia.photo1_caption'] ?? 'Koridor, 1986';
+  const photo2Url     = cms?.['nostalgia.photo2_url']     ?? '';
+  const photo2Caption = cms?.['nostalgia.photo2_caption'] ?? 'Wisuda, 1987';
   const footerSchoolLine = cms?.['footer.school_line']     ?? 'St. Aloysius Bandung · Angkatan 1987';
 
   const approvedCount = dashboard?.approvedCount ?? 0;
@@ -205,20 +207,26 @@ export default function PublicLanding() {
           </div>
           <div className="md:w-1/2 flex gap-5 justify-center items-center">
             <div className="-rotate-2 bg-white p-3 shadow-xl border border-amber-200/60 shrink-0">
-              <div
-                className="w-36 h-48 flex items-center justify-center text-gray-400 text-[10px] uppercase tracking-widest"
-                style={{ backgroundColor: '#e8e0d4' }}
-              >
-                Foto Angkatan
+              <div className="w-36 h-48 overflow-hidden" style={{ backgroundColor: '#e8e0d4' }}>
+                {photo1Url ? (
+                  <img src={photo1Url} alt={photo1Caption} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-[10px] uppercase tracking-widest">
+                    Foto Angkatan
+                  </div>
+                )}
               </div>
               <p className="mt-2 text-center text-[9px] uppercase tracking-widest text-gray-400">{photo1Caption}</p>
             </div>
             <div className="rotate-3 bg-white p-3 shadow-xl border border-amber-200/60 shrink-0 mt-10">
-              <div
-                className="w-36 h-48 flex items-center justify-center text-gray-400 text-[10px] uppercase tracking-widest"
-                style={{ backgroundColor: '#e8e0d4' }}
-              >
-                Foto Wisuda
+              <div className="w-36 h-48 overflow-hidden" style={{ backgroundColor: '#e8e0d4' }}>
+                {photo2Url ? (
+                  <img src={photo2Url} alt={photo2Caption} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-[10px] uppercase tracking-widest">
+                    Foto Wisuda
+                  </div>
+                )}
               </div>
               <p className="mt-2 text-center text-[9px] uppercase tracking-widest text-gray-400">{photo2Caption}</p>
             </div>

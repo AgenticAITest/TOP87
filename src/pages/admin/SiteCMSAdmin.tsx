@@ -64,8 +64,10 @@ const PAGES: Record<string, PageDef> = {
       nostalgia: {
         label: 'Nostalgia Section',
         fields: {
-          photo1_caption: { label: 'Photo 1 caption', type: 'text', hint: 'Caption below the first photo placeholder, e.g. "Koridor, 1986"' },
-          photo2_caption: { label: 'Photo 2 caption', type: 'text', hint: 'Caption below the second photo placeholder, e.g. "Wisuda, 1987"' },
+          photo1_url:     { label: 'Photo 1 image',   type: 'image_url', hint: 'Upload or paste URL for the first nostalgia photo.' },
+          photo1_caption: { label: 'Photo 1 caption', type: 'text',      hint: 'Caption below the first photo, e.g. "Koridor, 1986"' },
+          photo2_url:     { label: 'Photo 2 image',   type: 'image_url', hint: 'Upload or paste URL for the second nostalgia photo.' },
+          photo2_caption: { label: 'Photo 2 caption', type: 'text',      hint: 'Caption below the second photo, e.g. "Wisuda, 1987"' },
         },
       },
       footer: {
