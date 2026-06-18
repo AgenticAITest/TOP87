@@ -16,7 +16,7 @@ export interface Profile {
   nickname: string | null;
   birthdate: string | null;
   whatsapp: string | null;
-  reunion_attendance: 'yes' | 'most_likely' | 'undecided' | 'no' | null;
+  reunion_attendance: 'yes' | 'undecided' | 'no' | null;
   reunion_no_reason: string | null;
   funny_event: string | null;
   message_to_friends: string | null;

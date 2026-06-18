@@ -110,7 +110,7 @@ export default function Landing() {
 
   const countdown        = useCountdown(reunionIso);
   const approvedCount    = dashboard?.approvedCount ?? 0;
-  const confirmedCount   = (dashboard?.attendance.yes ?? 0) + (dashboard?.attendance.most_likely ?? 0);
+  const confirmedCount   = dashboard?.attendance.yes ?? 0;
   const attendancePct    = quotaTarget > 0 ? Math.min(Math.round((confirmedCount / quotaTarget) * 100), 100) : 0;
   const isApproved       = profile?.status === 'approved';
 
@@ -249,14 +249,10 @@ export default function Landing() {
 
           {/* Attendance intent breakdown */}
           {dashboard?.attendance && (
-            <div className="grid grid-cols-4 gap-1 mb-4 bg-amber-50/60 dark:bg-amber-900/10 rounded-lg p-2 border border-amber-100 dark:border-amber-800/20">
+            <div className="grid grid-cols-3 gap-1 mb-4 bg-amber-50/60 dark:bg-amber-900/10 rounded-lg p-2 border border-amber-100 dark:border-amber-800/20">
               <div className="text-center">
                 <p className="text-sm font-bold text-green-700 dark:text-green-400">{dashboard.attendance.yes}</p>
                 <p className="text-[9px] text-gray-500 dark:text-gray-400 leading-tight">Hadir</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-bold text-blue-600 dark:text-blue-400">{dashboard.attendance.most_likely}</p>
-                <p className="text-[9px] text-gray-500 dark:text-gray-400 leading-tight">Berencana Hadir</p>
               </div>
               <div className="text-center">
                 <p className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{dashboard.attendance.undecided}</p>

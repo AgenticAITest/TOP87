@@ -5,7 +5,6 @@ import type { MerchandiseItem } from '../lib/queries';
 
 export interface AttendanceBreakdown {
   yes: number;
-  most_likely: number;
   undecided: number;
   no: number;
 }
@@ -77,10 +76,11 @@ export function useDashboardData() {
         fetchBudgetTarget().catch(() => 247_000_000),
       ]);
 
-      const attendance: AttendanceBreakdown = { yes: 0, most_likely: 0, undecided: 0, no: 0 };
+      const attendance: AttendanceBreakdown = { yes: 0, undecided: 0, no: 0 };
       (attendanceRes.data ?? []).forEach((p: any) => {
         const v = p.reunion_attendance as string;
-        if (v in attendance) attendance[v as keyof AttendanceBreakdown]++;
+        if (v === 'yes' || v === 'most_likely') attendance.yes++;
+        else if (v in attendance) attendance[v as keyof AttendanceBreakdown]++;
       });
 
       return {
