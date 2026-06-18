@@ -42,7 +42,7 @@ export default function MemberDirectory() {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 mb-8">
           <div>
             <span className="text-xs font-bold tracking-[0.3em] uppercase text-gold/70 mb-2 block">Alumni Network</span>
-            <h2 className="text-4xl font-bold text-forest font-serif">Member Directory</h2>
+            <h2 className="text-4xl font-bold text-forest dark:text-gold font-serif">Member Directory</h2>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
             <div className="relative w-full sm:w-64">
@@ -52,13 +52,13 @@ export default function MemberDirectory() {
                 placeholder="Search alumni…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full bg-white border border-amber-200 rounded-full py-2 pl-10 pr-4 text-sm text-gray-800 focus:outline-none focus:border-gold/50 transition-colors"
+                className="w-full bg-white dark:bg-white/10 border border-amber-200 dark:border-white/10 rounded-full py-2 pl-10 pr-4 text-sm text-gray-800 dark:text-gray-200 focus:outline-none focus:border-gold/50 transition-colors"
               />
             </div>
             <select
               value={selectedCharter}
               onChange={e => setCharter(e.target.value)}
-              className="glass-card px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest text-gray-600 border border-amber-200 focus:outline-none cursor-pointer"
+              className="glass-card px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest text-gray-600 dark:text-gray-300 border border-amber-200 dark:border-white/10 focus:outline-none cursor-pointer"
             >
               <option value="">All Charters</option>
               {charters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -90,7 +90,7 @@ export default function MemberDirectory() {
                         className="w-14 h-14 rounded-xl object-cover transition-all duration-500"
                       />
                     ) : (
-                      <div className="w-14 h-14 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center">
+                      <div className="w-14 h-14 rounded-xl bg-amber-50 dark:bg-white/10 border border-amber-200 dark:border-white/10 flex items-center justify-center">
                         <span className="text-xl font-serif font-bold text-gold">{member.name?.charAt(0) ?? '?'}</span>
                       </div>
                     )}
@@ -99,24 +99,24 @@ export default function MemberDirectory() {
                     </div>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-serif text-base font-bold text-forest group-hover:text-gold transition-colors truncate">
+                    <h3 className="font-serif text-base font-bold text-forest dark:text-gray-100 group-hover:text-gold transition-colors truncate">
                       {member.name}
                     </h3>
-                    {member.profession && <p className="text-sm text-gray-500 truncate">{member.profession}</p>}
+                    {member.profession && <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{member.profession}</p>}
                     {member.city && (
-                      <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
+                      <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-1">
                         <MapPin size={10} /> {member.city}
                       </p>
                     )}
                   </div>
                 </div>
-                <div className="mt-4 pt-4 border-t border-amber-100 flex items-center justify-between">
+                <div className="mt-4 pt-4 border-t border-amber-100 dark:border-white/10 flex items-center justify-between">
                   <span className="text-[10px] uppercase tracking-widest text-gold/60">
                     {member.primaryCharter?.name ?? '—'}
                   </span>
                   <Link
                     to={`/members/${member.id}`}
-                    className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 hover:text-gold transition-colors"
+                    className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 hover:text-gold transition-colors"
                   >
                     View Profile →
                   </Link>

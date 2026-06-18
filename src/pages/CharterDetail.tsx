@@ -40,7 +40,7 @@ export default function CharterDetail() {
 
       <div className={`px-6 md:px-8 ${(charter as any).hero_image_url ? 'pt-6' : 'pt-8'} pb-16`}>
       <div className="max-w-6xl">
-        <Link to="/charters" className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-gray-500 hover:text-forest transition-colors mb-8">
+        <Link to="/charters" className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-gray-500 dark:text-gray-400 hover:text-forest dark:hover:text-gold transition-colors mb-8">
           <ArrowLeft size={14} /> All Charters
         </Link>
 
@@ -51,12 +51,12 @@ export default function CharterDetail() {
               : <Globe className="text-gold" size={18} />}
             <span className="text-xs uppercase tracking-[0.3em] text-gold/70">Charter</span>
           </div>
-          <h1 className="font-serif text-4xl md:text-6xl font-bold text-forest mb-2">{charter.name}</h1>
-          <p className="text-gray-500 text-base mb-3">{charter.city}, {charter.country}</p>
+          <h1 className="font-serif text-4xl md:text-6xl font-bold text-forest dark:text-gold mb-2">{charter.name}</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-base mb-3">{charter.city}, {charter.country}</p>
           {charter.description && (
-            <p className="text-gray-600 max-w-xl leading-relaxed">{charter.description}</p>
+            <p className="text-gray-600 dark:text-gray-300 max-w-xl leading-relaxed">{charter.description}</p>
           )}
-          <div className="flex items-center gap-2 mt-5 text-sm text-gray-500">
+          <div className="flex items-center gap-2 mt-5 text-sm text-gray-500 dark:text-gray-400">
             <Users size={16} />
             <span>{members.length} approved member{members.length !== 1 ? 's' : ''}</span>
           </div>
@@ -67,7 +67,7 @@ export default function CharterDetail() {
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             className="flex gap-3 items-start glass-card border-l-4 border-gold rounded-xl p-4 mb-8 max-w-2xl">
             <Megaphone size={16} className="text-gold shrink-0 mt-0.5" />
-            <p className="text-sm text-gray-700 leading-relaxed">{(charter as any).announcement}</p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{(charter as any).announcement}</p>
           </motion.div>
         )}
 
@@ -88,26 +88,26 @@ export default function CharterDetail() {
                     <img src={member.avatar_url} alt={member.name} referrerPolicy="no-referrer"
                       className="w-12 h-12 rounded-xl object-cover shrink-0" />
                   ) : (
-                    <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+                    <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-white/10 border border-amber-200 dark:border-white/10 flex items-center justify-center shrink-0">
                       <span className="font-serif font-bold text-gold text-lg">{member.name?.charAt(0)}</span>
                     </div>
                   )}
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-forest group-hover:text-gold transition-colors truncate">{member.name}</h3>
+                      <h3 className="font-semibold text-forest dark:text-gray-100 group-hover:text-gold transition-colors truncate">{member.name}</h3>
                       {member.is_primary && <ShieldCheck size={12} className="text-gold shrink-0" />}
                     </div>
-                    {member.profession && <p className="text-xs text-gray-500 truncate">{member.profession}</p>}
+                    {member.profession && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{member.profession}</p>}
                     {member.city && (
-                      <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                      <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-0.5">
                         <MapPin size={9} /> {member.city}
                       </p>
                     )}
                   </div>
                 </div>
-                <div className="mt-4 pt-4 border-t border-amber-100 flex justify-end">
+                <div className="mt-4 pt-4 border-t border-amber-100 dark:border-white/10 flex justify-end">
                   <Link to={`/members/${member.id}`}
-                    className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 hover:text-gold transition-colors">
+                    className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 hover:text-gold transition-colors">
                     View Profile →
                   </Link>
                 </div>

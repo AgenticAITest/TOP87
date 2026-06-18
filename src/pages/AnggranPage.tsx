@@ -50,8 +50,8 @@ export default function AnggranPage() {
   return (
     <div className="p-6 md:p-8 max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-4xl font-bold text-forest mb-2">Anggaran & Transparansi</h1>
-        <p className="text-gray-600 text-sm">
+        <h1 className="text-4xl font-bold text-forest dark:text-gold mb-2">Anggaran & Transparansi</h1>
+        <p className="text-gray-600 dark:text-gray-300 text-sm">
           Seluruh anggaran reuni dipublikasikan secara transparan untuk anggota alumni.
         </p>
       </div>
@@ -60,27 +60,27 @@ export default function AnggranPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-amber-200">
-                <th className="py-3 font-medium text-gray-500 w-12">No</th>
-                <th className="py-3 font-medium text-gray-500">Keterangan</th>
-                <th className="py-3 font-medium text-gray-500 text-right whitespace-nowrap">Total Biaya</th>
-                <th className="py-3 font-medium text-gray-500 text-right whitespace-nowrap">Per Orang</th>
+              <tr className="border-b border-amber-200 dark:border-white/10">
+                <th className="py-3 font-medium text-gray-500 dark:text-gray-400 w-12">No</th>
+                <th className="py-3 font-medium text-gray-500 dark:text-gray-400">Keterangan</th>
+                <th className="py-3 font-medium text-gray-500 dark:text-gray-400 text-right whitespace-nowrap">Total Biaya</th>
+                <th className="py-3 font-medium text-gray-500 dark:text-gray-400 text-right whitespace-nowrap">Per Orang</th>
               </tr>
             </thead>
-            <tbody className="text-gray-800">
+            <tbody className="text-gray-800 dark:text-gray-200">
               {items.map((item, i) => {
                 const perOrang   = mode === 'per_person' ? item.amount : (quota > 0 ? Math.round(item.amount / quota) : 0);
                 const totalBiaya = mode === 'per_person' ? item.amount * quota : item.amount;
                 return (
-                  <tr key={i} className="border-b border-amber-100 hover:bg-amber-50/50 transition-colors">
-                    <td className="py-4 text-gray-500">{i + 1}</td>
+                  <tr key={i} className="border-b border-amber-100 dark:border-white/5 hover:bg-amber-50/50 dark:hover:bg-white/5 transition-colors">
+                    <td className="py-4 text-gray-500 dark:text-gray-400">{i + 1}</td>
                     <td className="py-4 font-medium">{item.keterangan}</td>
                     <td className="py-4 text-right whitespace-nowrap">{fmt(totalBiaya)}</td>
                     <td className="py-4 text-right whitespace-nowrap">{fmt(perOrang)}</td>
                   </tr>
                 );
               })}
-              <tr className="font-bold text-gray-900 bg-amber-50">
+              <tr className="font-bold text-gray-900 dark:text-white bg-amber-50 dark:bg-white/10">
                 <td className="py-4 px-2" colSpan={2}>TOTAL ANGGARAN REUNI</td>
                 <td className="py-4 text-right whitespace-nowrap">{fmt(grandTotal)}</td>
                 <td className="py-4 text-right whitespace-nowrap">{fmt(grandPerOrang)}</td>
@@ -99,9 +99,9 @@ export default function AnggranPage() {
           </table>
         </div>
 
-        <div className="mt-6 flex items-start gap-2 border-t border-amber-100 pt-4">
+        <div className="mt-6 flex items-start gap-2 border-t border-amber-100 dark:border-white/10 pt-4">
           <Info className="w-4 h-4 text-gold shrink-0 mt-0.5" />
-          <p className="text-xs text-gray-500 italic">{note}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 italic">{note}</p>
         </div>
       </div>
     </div>

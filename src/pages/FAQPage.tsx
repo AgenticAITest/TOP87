@@ -14,18 +14,18 @@ const DEFAULT_FAQ: FAQItem[] = [
 
 function AccordionItem({ item, isOpen, onToggle }: { item: FAQItem; isOpen: boolean; onToggle: () => void }) {
   return (
-    <div className="border-b border-amber-100 last:border-0">
+    <div className="border-b border-amber-100 dark:border-white/10 last:border-0">
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between py-4 text-left gap-4"
       >
-        <span className="font-medium text-gray-800 text-sm">{item.q}</span>
+        <span className="font-medium text-gray-800 dark:text-gray-200 text-sm">{item.q}</span>
         <ChevronDown
           className={`w-4 h-4 text-gold shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
       {isOpen && (
-        <div className="pb-4 text-sm text-gray-600 leading-relaxed pr-8">
+        <div className="pb-4 text-sm text-gray-600 dark:text-gray-300 leading-relaxed pr-8">
           {item.a}
         </div>
       )}
@@ -47,8 +47,8 @@ export default function FAQPage() {
   return (
     <div className="p-6 md:p-8 max-w-3xl">
       <div className="mb-8">
-        <h1 className="text-4xl font-bold text-forest mb-2">FAQ</h1>
-        <p className="text-gray-600 text-sm">Pertanyaan yang sering ditanyakan seputar Reuni TOP87.</p>
+        <h1 className="text-4xl font-bold text-forest dark:text-gold mb-2">FAQ</h1>
+        <p className="text-gray-600 dark:text-gray-300 text-sm">Pertanyaan yang sering ditanyakan seputar Reuni TOP87.</p>
       </div>
 
       <div className="glass-card p-6 rounded-xl shadow-sm">
