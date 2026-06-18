@@ -50,6 +50,8 @@ export const qk = {
   paymentSummary:   (isSuperAdmin: boolean, ids: string[]) => ['admin', 'payment-summary', isSuperAdmin, ...ids] as const,
   // Member iuran ledger status
   memberIuranPaid:  (profileId: string)                    => ['member-iuran-paid', profileId]                   as const,
+  // Kaos (t-shirt) report
+  kaosReport:       (isSuperAdmin: boolean, ids: string[]) => ['admin', 'kaos-report', isSuperAdmin, ...ids]      as const,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1451,4 +1453,45 @@ export async function setSiteSetting(key: string, value: string): Promise<void> 
     .from('site_settings')
     .upsert({ key, value }, { onConflict: 'key' });
   if (error) throw error;
+}
+
+// ─── Kaos (T-shirt) Report ────────────────────────────────────────────────────
+
+export interface KaosRow {
+  profile_id:   string;
+  name:         string | null;
+  charter_name: string | null;
+  tshirt_size:  string | null;
+  iuran_paid:   boolean;
+}
+
+export async function fetchKaosReport(
+  isSuperAdmin: boolean,
+  charterIds: string[],
+): Promise<KaosRow[]> {
+  const profileIds = await charterScope(isSuperAdmin, charterIds);
+
+  const mq = supabase
+    .from('profiles')
+    .select('id, name, tshirt_size, charter_members(is_primary, charters(name))')
+    .eq('status', 'approved')
+    .order('name');
+  const { data: members, error: mErr } = profileIds ? await mq.in('id', profileIds) : await mq;
+  if (mErr) throw mErr;
+
+  let pq = supabase.from('payments').select('profile_id').eq('type', 'reunion_fee').eq('status', 'confirmed');
+  if (profileIds) pq = pq.in('profile_id', profileIds);
+  const { data: paidData } = await pq;
+  const paidSet = new Set((paidData ?? []).map((p: any) => p.profile_id as string));
+
+  return (members ?? []).map((m: any) => {
+    const primary = (m.charter_members ?? []).find((cm: any) => cm.is_primary) ?? (m.charter_members ?? [])[0];
+    return {
+      profile_id:   m.id,
+      name:         m.name,
+      charter_name: primary?.charters?.name ?? null,
+      tshirt_size:  m.tshirt_size,
+      iuran_paid:   paidSet.has(m.id),
+    };
+  });
 }

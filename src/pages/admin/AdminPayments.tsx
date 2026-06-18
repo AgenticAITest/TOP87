@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Search, Check, X, ExternalLink, Loader, ChevronDown, UserCheck, Plus, List, BarChart2 } from 'lucide-react';
+import { Search, Check, X, ExternalLink, Loader, ChevronDown, UserCheck, Plus, List, BarChart2, Shirt } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
@@ -8,12 +8,13 @@ import {
   fetchAdminPayments, updatePaymentAdmin,
   fetchApprovedMembers, fetchPaymentSummaryReport,
   fetchPaymentAllocations, savePaymentAllocations,
-  qk, type Payment, type MemberPaymentSummary, type LedgerAllocation, type AccountType,
+  fetchKaosReport,
+  qk, type Payment, type MemberPaymentSummary, type LedgerAllocation, type AccountType, type KaosRow,
 } from '../../lib/queries';
 
 type TypeFilter   = 'all' | 'reunion_fee' | 'donation';
 type StatusFilter = 'all' | 'submitted' | 'pending_review' | 'confirmed' | 'rejected';
-type View         = 'transaksi' | 'rekap';
+type View         = 'transaksi' | 'rekap' | 'kaos';
 
 const STATUS_COLORS: Record<string, string> = {
   submitted:      'bg-blue-500/10 text-blue-400',
@@ -507,6 +508,79 @@ function RekapTable({ rows, isLoading }: { rows: MemberPaymentSummary[]; isLoadi
   );
 }
 
+// ─── Kaos View ───────────────────────────────────────────────────────────────
+
+const TSHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+
+function KaosView({ rows, isLoading }: { rows: KaosRow[]; isLoading: boolean }) {
+  if (isLoading) {
+    return <div className="text-center py-16 text-gray-500 text-sm uppercase tracking-widest animate-pulse">Loading…</div>;
+  }
+
+  const paidRows  = rows.filter(r => r.iuran_paid);
+  const sizeCounts = TSHIRT_SIZES.reduce<Record<string, number>>((acc, s) => {
+    acc[s] = paidRows.filter(r => r.tshirt_size === s).length;
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-6">
+      {/* Summary cards */}
+      <div>
+        <p className="text-xs uppercase tracking-widest text-gray-500 mb-3">
+          Rekap Ukuran — Anggota Lunas Iuran ({paidRows.length} orang)
+        </p>
+        <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+          {TSHIRT_SIZES.map(size => (
+            <div key={size} className="glass rounded-xl p-3 text-center">
+              <p className="text-xl font-bold font-serif text-gold">{sizeCounts[size]}</p>
+              <p className="text-[10px] uppercase tracking-widest text-gray-500 mt-1">{size}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Detail table */}
+      <div className="glass rounded-2xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/10">
+              <th className="text-left px-5 py-3 text-xs uppercase tracking-widest text-gray-500">Anggota</th>
+              <th className="text-left px-5 py-3 text-xs uppercase tracking-widest text-gray-500">Charter</th>
+              <th className="text-center px-5 py-3 text-xs uppercase tracking-widest text-gray-500">Ukuran</th>
+              <th className="text-center px-5 py-3 text-xs uppercase tracking-widest text-gray-500">Iuran</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="text-center py-10 text-gray-600 text-sm">Belum ada data.</td>
+              </tr>
+            ) : rows.map(r => (
+              <tr key={r.profile_id} className="border-b border-white/5 hover:bg-white/3 transition-colors">
+                <td className="px-5 py-3 text-white font-medium">{r.name ?? '—'}</td>
+                <td className="px-5 py-3 text-gray-400 text-xs">{r.charter_name ?? '—'}</td>
+                <td className="px-5 py-3 text-center">
+                  {r.tshirt_size ? (
+                    <span className="bg-gold/10 text-gold border border-gold/20 text-xs font-bold px-2.5 py-1 rounded-full">{r.tshirt_size}</span>
+                  ) : (
+                    <span className="text-gray-600 text-xs italic">belum dipilih</span>
+                  )}
+                </td>
+                <td className="px-5 py-3 text-center">
+                  {r.iuran_paid
+                    ? <span className="text-green-400 text-xs font-bold uppercase">Lunas</span>
+                    : <span className="text-gray-600 text-xs">—</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AdminPayments() {
@@ -528,6 +602,13 @@ export default function AdminPayments() {
     queryKey: qk.paymentSummary(isSuperAdmin, charterIds),
     queryFn:  () => fetchPaymentSummaryReport(isSuperAdmin, charterIds),
     enabled:  !adminLoading && view === 'rekap',
+    staleTime: 2 * 60_000,
+  });
+
+  const { data: kaosRows = [], isLoading: kaosLoading } = useQuery({
+    queryKey: qk.kaosReport(isSuperAdmin, charterIds),
+    queryFn:  () => fetchKaosReport(isSuperAdmin, charterIds),
+    enabled:  !adminLoading && view === 'kaos',
     staleTime: 2 * 60_000,
   });
 
@@ -597,6 +678,16 @@ export default function AdminPayments() {
         >
           <BarChart2 size={13} /> Rekap Anggota
         </button>
+        <button
+          onClick={() => setView('kaos')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
+            view === 'kaos'
+              ? 'bg-gold/15 text-gold border border-gold/30'
+              : 'text-gray-500 border border-white/10 hover:text-white hover:border-white/20'
+          }`}
+        >
+          <Shirt size={13} /> Rekap Kaos
+        </button>
       </div>
 
       {/* ── Rekap view ── */}
@@ -604,6 +695,11 @@ export default function AdminPayments() {
         <div className="glass rounded-2xl p-6">
           <RekapTable rows={summaryRows} isLoading={summaryLoading} />
         </div>
+      )}
+
+      {/* ── Kaos view ── */}
+      {view === 'kaos' && (
+        <KaosView rows={kaosRows} isLoading={kaosLoading} />
       )}
 
       {/* ── Transaksi view ── */}

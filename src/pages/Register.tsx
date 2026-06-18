@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { qk, fetchCharters } from '../lib/queries';
@@ -11,6 +12,8 @@ const ATTENDANCE_OPTIONS = [
   { value: 'undecided', label: 'Belum Tahu',          color: 'text-yellow-700 bg-yellow-50 border-yellow-300' },
   { value: 'no',        label: 'Tidak Bisa Hadir',   color: 'text-red-600   bg-red-50   border-red-300' },
 ] as const;
+
+const TSHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'] as const;
 
 function toTitleCase(str: string): string {
   return str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
@@ -23,6 +26,7 @@ export default function Register() {
   const [primaryCharter, setPrimary] = useState('');
   const [extraCharters, setExtras]   = useState<string[]>([]);
 
+  const [showSizeChart, setShowSizeChart] = useState(false);
   const [form, setForm] = useState({
     name:               profile?.name ?? user?.user_metadata?.full_name ?? '',
     phone:              profile?.phone ?? '',
@@ -34,6 +38,7 @@ export default function Register() {
     whatsapp:           profile?.whatsapp ?? '',
     reunion_attendance: (profile?.reunion_attendance ?? '') as string,
     reunion_no_reason:  profile?.reunion_no_reason ?? '',
+    tshirt_size:        profile?.tshirt_size ?? '',
   });
 
   const { data: charters = [] } = useQuery({
@@ -61,6 +66,7 @@ export default function Register() {
           whatsapp:           form.whatsapp || null,
           reunion_attendance: form.reunion_attendance || null,
           reunion_no_reason:  form.reunion_attendance === 'no' ? form.reunion_no_reason || null : null,
+          tshirt_size:        form.tshirt_size || null,
           status:             'pending',
           updated_at:         new Date().toISOString(),
         }, { onConflict: 'id' });
@@ -87,6 +93,7 @@ export default function Register() {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!form.tshirt_size) { alert('Pilih ukuran kaos terlebih dahulu.'); return; }
     submitMutation.mutate();
   }
 
@@ -203,6 +210,36 @@ export default function Register() {
             )}
           </div>
 
+          {/* ── T-Shirt Size ── */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-xs uppercase tracking-widest text-gray-500">
+                Ukuran Kaos Reuni *
+              </label>
+              <button type="button"
+                onClick={() => setShowSizeChart(true)}
+                className="text-xs text-gold underline hover:text-gold/70 transition-colors">
+                Lihat Size Chart
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {TSHIRT_SIZES.map(size => (
+                <button key={size} type="button"
+                  onClick={() => setForm(f => ({ ...f, tshirt_size: size }))}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
+                    form.tshirt_size === size
+                      ? 'bg-gold/15 text-gold border-gold/50 ring-2 ring-gold/30'
+                      : 'bg-white border-amber-200 text-gray-600 hover:border-amber-300'
+                  }`}>
+                  {size}
+                </button>
+              ))}
+            </div>
+            {!form.tshirt_size && (
+              <p className="text-[11px] text-amber-600 mt-2">Pilih ukuran kaos kamu — wajib diisi.</p>
+            )}
+          </div>
+
           {/* ── Charter Membership ── */}
           <div>
             <label className="block text-xs uppercase tracking-widest text-gray-500 mb-3">Charter Membership *</label>
@@ -256,6 +293,20 @@ export default function Register() {
           </button>
         </form>
       </motion.div>
+
+      {/* ── Size Chart Modal ── */}
+      {showSizeChart && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
+          onClick={() => setShowSizeChart(false)}>
+          <div className="relative max-w-2xl w-full" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setShowSizeChart(false)}
+              className="absolute -top-10 right-0 text-white/70 hover:text-white transition-colors">
+              <X size={24} />
+            </button>
+            <img src="/size_chart.jpeg" alt="Size Chart" className="w-full rounded-xl shadow-2xl" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

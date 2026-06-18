@@ -20,6 +20,7 @@ export interface Profile {
   reunion_no_reason: string | null;
   funny_event: string | null;
   message_to_friends: string | null;
+  tshirt_size: string | null;
 }
 
 interface AuthContextType {

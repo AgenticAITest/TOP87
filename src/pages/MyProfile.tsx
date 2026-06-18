@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, FormEvent, ChangeEvent } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Save, Camera, Loader, RefreshCw, UserPlus, X, Search } from 'lucide-react';
+import { ShieldCheck, Save, Camera, Loader, RefreshCw, UserPlus, X, Search, Ruler } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -13,6 +13,8 @@ const ATTENDANCE_OPTIONS = [
   { value: 'no',        label: 'Tidak Bisa Hadir',  color: 'text-red-600   bg-red-50   border-red-300' },
 ] as const;
 
+const TSHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'] as const;
+
 function toTitleCase(str: string): string {
   return str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 }
@@ -23,6 +25,7 @@ export default function MyProfile() {
   const { user, profile, loading, refreshProfile } = useAuth();
   const queryClient = useQueryClient();
   const [retrying, setRetrying] = useState(false);
+  const [showSizeChart, setShowSizeChart] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: memberships = [] } = useQuery({
@@ -58,6 +61,7 @@ export default function MyProfile() {
     reunion_no_reason:  profile?.reunion_no_reason ?? '',
     funny_event:        profile?.funny_event ?? '',
     message_to_friends: profile?.message_to_friends ?? '',
+    tshirt_size:        profile?.tshirt_size ?? '',
   });
   const [saved, setSaved] = useState(false);
   const formKey = profile?.id ?? 'none';
@@ -125,6 +129,7 @@ export default function MyProfile() {
         reunion_no_reason:  f.reunion_attendance === 'no' ? f.reunion_no_reason || null : null,
         funny_event:        f.funny_event || null,
         message_to_friends: f.message_to_friends || null,
+        tshirt_size:        f.tshirt_size || null,
         updated_at:         new Date().toISOString(),
       }).eq('id', user!.id);
       if (error) throw error;
@@ -295,6 +300,7 @@ export default function MyProfile() {
             reunion_no_reason:  profile.reunion_no_reason ?? '',
             funny_event:        profile.funny_event ?? '',
             message_to_friends: profile.message_to_friends ?? '',
+            tshirt_size:        profile.tshirt_size ?? '',
           }); }}>
 
           {/* ── Full Name + Nickname ── */}
@@ -416,6 +422,33 @@ export default function MyProfile() {
               placeholder="Apa yang ingin kamu sampaikan kepada teman-teman angkatan?" />
           </div>
 
+          {/* ── T-Shirt Size ── */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <label className="flex items-center gap-2 text-xs uppercase tracking-widest text-gray-500">
+                <Ruler size={12} /> Ukuran Kaos Reuni
+              </label>
+              <button type="button"
+                onClick={() => setShowSizeChart(true)}
+                className="text-xs text-gold underline hover:text-gold/70 transition-colors">
+                Lihat Size Chart
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {TSHIRT_SIZES.map(size => (
+                <button key={size} type="button"
+                  onClick={() => setForm(f => ({ ...f, tshirt_size: size }))}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
+                    form.tshirt_size === size
+                      ? 'bg-gold/15 text-gold border-gold/50 ring-2 ring-gold/30'
+                      : 'bg-white border-amber-200 text-gray-600 hover:border-amber-300'
+                  }`}>
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {updateMutation.isError && (
             <p className="text-red-400 text-sm">{(updateMutation.error as Error).message}</p>
           )}
@@ -523,6 +556,20 @@ export default function MyProfile() {
         </div>
 
       </div>
+
+      {/* ── Size Chart Modal ── */}
+      {showSizeChart && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
+          onClick={() => setShowSizeChart(false)}>
+          <div className="relative max-w-2xl w-full" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setShowSizeChart(false)}
+              className="absolute -top-10 right-0 text-white/70 hover:text-white transition-colors">
+              <X size={24} />
+            </button>
+            <img src="/size_chart.jpeg" alt="Size Chart" className="w-full rounded-xl shadow-2xl" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
