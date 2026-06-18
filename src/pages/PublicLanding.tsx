@@ -59,6 +59,7 @@ export default function PublicLanding() {
   const heroBgUrl       = cms?.['hero.image_url']          ?? DEFAULT_HERO_BG;
   const reunionIso      = cms?.['reunion.date_iso']        ?? DEFAULT_REUNION_ISO;
   const venue           = cms?.['reunion.venue']           ?? 'Bandung / Ciwidey';
+  const heroDate        = cms?.['hero.date']               ?? '29 – 30 April 2027';
   const quotaTarget     = parseInt(cms?.['kpi.quota']      ?? String(DEFAULT_QUOTA), 10);
   const photo1Url     = cms?.['nostalgia.photo1_url']     ?? '';
   const photo1Caption = cms?.['nostalgia.photo1_caption'] ?? 'Koridor, 1986';
@@ -118,7 +119,7 @@ export default function PublicLanding() {
 
         <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
           <p className="text-[11px] uppercase tracking-[0.4em] text-gold/75 mb-6">
-            {venue} &nbsp;·&nbsp; 29 – 30 April 2027
+            {venue} &nbsp;·&nbsp; {heroDate}
           </p>
 
           <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl font-bold text-white italic leading-tight mb-5">
