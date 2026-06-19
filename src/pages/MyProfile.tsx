@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, FormEvent, ChangeEvent } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Save, Camera, Loader, RefreshCw, UserPlus, X, Search, Ruler, HeartHandshake } from 'lucide-react';
+import { ShieldCheck, Save, Camera, Loader, RefreshCw, UserPlus, X, Search, Ruler, HeartHandshake, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -478,15 +478,107 @@ export default function MyProfile() {
             </div>
           </div>
 
-          {/* ── Permintaan Khusus ── */}
-          <div>
-            <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Permintaan Khusus</label>
-            <textarea value={form.special_needs}
-              onChange={e => setForm(f => ({ ...f, special_needs: e.target.value }))}
-              rows={3}
-              className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors resize-none"
-              placeholder="Ceritakan kebutuhan khusus kamu, misalnya kamar non-smoking, akses disabilitas, pantangan makanan tertentu, dll." />
-            <p className="text-[11px] text-gray-400 mt-1.5">Panitia akan berusaha mengakomodasi sesuai kemampuan.</p>
+          {/* ── Kebutuhan & Permintaan Khusus ── */}
+          <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+            <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-3">Kebutuhan &amp; Permintaan Khusus</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+              {/* Card: Kebutuhan Khusus */}
+              <div className="bg-white rounded-xl border border-amber-100 p-4 flex flex-col gap-3">
+                <div className="flex items-start gap-2">
+                  <Sparkles size={15} className="text-gold/70 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">Kebutuhan Khusus</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">Kamar non-smoking, akses disabilitas, pantangan makanan, dll.</p>
+                  </div>
+                </div>
+                <textarea
+                  value={form.special_needs}
+                  onChange={e => setForm(f => ({ ...f, special_needs: e.target.value }))}
+                  rows={4}
+                  className="w-full bg-amber-50/60 border border-amber-100 rounded-lg px-3 py-2.5 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors resize-none flex-1"
+                  placeholder="Ceritakan kebutuhanmu…"
+                />
+              </div>
+
+              {/* Card: Permintaan Keringanan */}
+              <div className="bg-white rounded-xl border border-amber-100 p-4 flex flex-col gap-3">
+                <div className="flex items-start gap-2">
+                  <HeartHandshake size={15} className="text-gold/70 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">Permintaan Keringanan</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">Ajukan keringanan iuran jika kondisi kamu tidak memungkinkan.</p>
+                  </div>
+                </div>
+
+                {myKeringanan ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-3 flex-1">
+                    <p className="text-[10px] uppercase tracking-widest text-amber-600 mb-1.5">Permintaan Terkirim</p>
+                    <p className="text-xs text-gray-700"><span className="font-medium">Sanggup:</span> Rp {myKeringanan.jumlah_sanggup.toLocaleString('id-ID')}</p>
+                    <p className="text-xs text-gray-700 mt-1 line-clamp-3"><span className="font-medium">Alasan:</span> {myKeringanan.alasan}</p>
+                    <p className="text-[10px] text-gray-400 mt-2">Status: <span className="font-semibold">{myKeringanan.status === 'pending' ? 'Menunggu review' : myKeringanan.status}</span></p>
+                  </div>
+                ) : showKeringanan ? (
+                  <div className="flex flex-col gap-2 flex-1">
+                    {keringananSuccess ? (
+                      <p className="text-green-600 text-sm">Permintaan berhasil dikirim. Terima kasih.</p>
+                    ) : (
+                      <>
+                        <input type="tel"
+                          value={keringananForm.contact_number}
+                          onChange={e => setKeringananForm(f => ({ ...f, contact_number: e.target.value }))}
+                          className="w-full bg-white border border-amber-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-gold/50 transition-colors"
+                          placeholder="No. WA/HP"
+                        />
+                        <input type="number" min={0}
+                          value={keringananForm.jumlah_sanggup}
+                          onChange={e => setKeringananForm(f => ({ ...f, jumlah_sanggup: e.target.value }))}
+                          className="w-full bg-white border border-amber-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-gold/50 transition-colors"
+                          placeholder="Jumlah sanggup (Rp)"
+                        />
+                        <textarea
+                          value={keringananForm.alasan}
+                          onChange={e => setKeringananForm(f => ({ ...f, alasan: e.target.value }))}
+                          rows={3}
+                          className="w-full bg-white border border-amber-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-gold/50 transition-colors resize-none"
+                          placeholder="Alasan permohonan…"
+                        />
+                        {keringananMutation.isError && (
+                          <p className="text-red-400 text-xs">{(keringananMutation.error as Error).message}</p>
+                        )}
+                        <div className="flex gap-2">
+                          <button type="button"
+                            onClick={() => keringananMutation.mutate()}
+                            disabled={keringananMutation.isPending || !keringananForm.alasan.trim()}
+                            className="btn-primary flex items-center gap-1.5 py-2 px-4 rounded-lg text-xs font-bold uppercase tracking-widest disabled:opacity-50">
+                            {keringananMutation.isPending ? <Loader size={12} className="animate-spin" /> : <HeartHandshake size={12} />}
+                            {keringananMutation.isPending ? 'Mengirim…' : 'Kirim'}
+                          </button>
+                          <button type="button" onClick={() => setShowKeringanan(false)}
+                            className="px-3 py-2 rounded-lg text-xs text-gray-500 hover:text-gray-700 border border-amber-200 transition-colors">
+                            Batal
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <button type="button"
+                    onClick={() => {
+                      setShowKeringanan(true);
+                      setKeringananForm(f => ({
+                        ...f,
+                        contact_number: profile.whatsapp ?? profile.phone ?? f.contact_number,
+                      }));
+                    }}
+                    className="flex items-center gap-2 text-sm text-gold border border-gold/30 bg-amber-50 hover:bg-amber-100 transition-colors px-4 py-2.5 rounded-lg font-medium self-start">
+                    <HeartHandshake size={14} />
+                    Ajukan Keringanan
+                  </button>
+                )}
+              </div>
+
+            </div>
           </div>
 
           {updateMutation.isError && (
@@ -595,94 +687,6 @@ export default function MyProfile() {
           </button>
         </div>
 
-        {/* ── Permintaan Keringanan ── */}
-        <div className="mt-6 glass-card p-6 rounded-xl shadow-sm">
-          <div className="flex items-center gap-3 mb-2">
-            <HeartHandshake size={18} className="text-gold/70" />
-            <div>
-              <p className="text-xs uppercase tracking-widest text-gray-400">Permintaan Keringanan</p>
-              <p className="text-[11px] text-gray-500 mt-0.5">Ajukan keringanan iuran jika diperlukan</p>
-            </div>
-          </div>
-
-          {myKeringanan ? (
-            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-4">
-              <p className="text-xs uppercase tracking-widest text-amber-600 mb-2">Permintaan Terkirim</p>
-              <p className="text-sm text-gray-700"><span className="font-medium">Jumlah sanggup:</span> Rp {myKeringanan.jumlah_sanggup.toLocaleString('id-ID')}</p>
-              <p className="text-sm text-gray-700 mt-1"><span className="font-medium">Alasan:</span> {myKeringanan.alasan}</p>
-              <p className="text-[11px] text-gray-400 mt-2">
-                Status: <span className="font-semibold capitalize">{myKeringanan.status === 'pending' ? 'Menunggu review' : myKeringanan.status}</span>
-              </p>
-            </div>
-          ) : showKeringanan ? (
-            <div className="mt-4 space-y-3">
-              {keringananSuccess ? (
-                <p className="text-green-600 text-sm font-medium">Permintaan keringanan berhasil dikirim. Terima kasih.</p>
-              ) : (
-                <>
-                  <div>
-                    <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1.5">No. Kontak (WA/HP)</label>
-                    <input type="tel"
-                      value={keringananForm.contact_number}
-                      onChange={e => setKeringananForm(f => ({ ...f, contact_number: e.target.value }))}
-                      className="w-full bg-white border border-amber-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-gold/50 transition-colors"
-                      placeholder="+62 812 …"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1.5">Jumlah yang Sanggup Dibayar (Rp)</label>
-                    <input type="number" min={0}
-                      value={keringananForm.jumlah_sanggup}
-                      onChange={e => setKeringananForm(f => ({ ...f, jumlah_sanggup: e.target.value }))}
-                      className="w-full bg-white border border-amber-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-gold/50 transition-colors"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1.5">Alasan Permohonan</label>
-                    <textarea
-                      value={keringananForm.alasan}
-                      onChange={e => setKeringananForm(f => ({ ...f, alasan: e.target.value }))}
-                      rows={3}
-                      className="w-full bg-white border border-amber-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-gold/50 transition-colors resize-none"
-                      placeholder="Ceritakan kondisi kamu…"
-                    />
-                  </div>
-                  {keringananMutation.isError && (
-                    <p className="text-red-400 text-sm">{(keringananMutation.error as Error).message}</p>
-                  )}
-                  <div className="flex gap-3">
-                    <button type="button"
-                      onClick={() => keringananMutation.mutate()}
-                      disabled={keringananMutation.isPending || !keringananForm.alasan.trim()}
-                      className="btn-primary flex items-center gap-2 font-bold py-2.5 px-6 rounded-xl text-xs uppercase tracking-widest disabled:opacity-50">
-                      {keringananMutation.isPending ? <Loader size={14} className="animate-spin" /> : <HeartHandshake size={14} />}
-                      {keringananMutation.isPending ? 'Mengirim…' : 'Kirim Permintaan'}
-                    </button>
-                    <button type="button"
-                      onClick={() => setShowKeringanan(false)}
-                      className="px-4 py-2.5 rounded-xl text-xs text-gray-500 hover:text-gray-700 border border-amber-200 hover:border-amber-300 transition-colors">
-                      Batal
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <button type="button"
-              onClick={() => {
-                setShowKeringanan(true);
-                setKeringananForm(f => ({
-                  ...f,
-                  contact_number: profile.whatsapp ?? profile.phone ?? f.contact_number,
-                }));
-              }}
-              className="mt-4 flex items-center gap-2 text-sm text-gold border border-gold/30 bg-amber-50 hover:bg-amber-100 transition-colors px-5 py-2.5 rounded-xl font-medium">
-              <HeartHandshake size={16} />
-              Ajukan Keringanan Iuran
-            </button>
-          )}
-        </div>
 
       </div>
 

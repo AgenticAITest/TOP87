@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Check, X, MessageSquare, Phone, Mail, Wallet } from 'lucide-react';
+import { Check, X, MessageSquare, Phone, Mail, Wallet, Sparkles, HeartHandshake } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { qk, fetchAllKeringanan, updateKeringananStatus, type KeringananRequest } from '../../lib/queries';
+import {
+  qk,
+  fetchAllKeringanan, updateKeringananStatus, type KeringananRequest,
+  fetchSpecialNeeds, type SpecialNeedsProfile,
+} from '../../lib/queries';
 
 const STATUS_STYLE: Record<string, string> = {
   pending:  'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
@@ -63,7 +67,6 @@ function RequestCard({ req }: { req: KeringananRequest }) {
           <p className="text-[10px] text-gray-500 mt-0.5">{timeAgo(req.created_at)}</p>
         </div>
 
-        {/* Action buttons — only for pending */}
         {req.status === 'pending' && (
           <div className="flex gap-2 shrink-0">
             <button
@@ -108,7 +111,6 @@ function RequestCard({ req }: { req: KeringananRequest }) {
         <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{req.alasan}</p>
       </div>
 
-      {/* Admin notes */}
       {req.admin_notes && !showNotes && (
         <div className="bg-gold/5 border border-gold/20 rounded-xl p-3">
           <p className="text-[10px] uppercase tracking-widest text-gold/60 mb-1">Catatan Admin</p>
@@ -160,12 +162,44 @@ function RequestCard({ req }: { req: KeringananRequest }) {
   );
 }
 
-export default function AdminKeringanan() {
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+function SpecialNeedsCard({ member }: { member: SpecialNeedsProfile }) {
+  const contact = member.whatsapp ?? member.phone;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="glass rounded-2xl p-5 space-y-3"
+    >
+      <div className="flex items-center gap-2">
+        <p className="text-sm font-bold text-white">{member.name ?? '—'}</p>
+        {contact && (
+          <span className="flex items-center gap-1 text-[10px] text-gray-500 ml-auto">
+            <Phone size={10} className="text-gray-600" />
+            {contact}
+          </span>
+        )}
+      </div>
+      <div className="bg-white/[0.03] rounded-xl p-3">
+        <p className="text-[10px] uppercase tracking-widest text-gray-600 mb-1.5">Kebutuhan</p>
+        <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{member.special_needs}</p>
+      </div>
+    </motion.div>
+  );
+}
 
-  const { data: requests = [], isLoading } = useQuery({
+export default function AdminKeringanan() {
+  const [pageTab, setPageTab]   = useState<'keringanan' | 'khusus'>('keringanan');
+  const [filter,  setFilter]    = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+
+  const { data: requests = [], isLoading: loadingKer } = useQuery({
     queryKey: qk.allKeringanan(),
     queryFn:  fetchAllKeringanan,
+    staleTime: 0,
+  });
+
+  const { data: specialList = [], isLoading: loadingKhusus } = useQuery({
+    queryKey: qk.specialNeeds(),
+    queryFn:  fetchSpecialNeeds,
     staleTime: 0,
   });
 
@@ -178,60 +212,115 @@ export default function AdminKeringanan() {
     rejected: requests.filter(r => r.status === 'rejected').length,
   };
 
-  const tabs = ['all', 'pending', 'approved', 'rejected'] as const;
+  const statusTabs = ['all', 'pending', 'approved', 'rejected'] as const;
 
   return (
     <div className="p-8 min-h-screen">
-      <div className="mb-8">
+      <div className="mb-6">
         <p className="text-xs uppercase tracking-[0.3em] text-gold/60 mb-1">Super Admin</p>
-        <h1 className="font-serif text-4xl font-bold text-white">Permintaan Keringanan</h1>
-        <p className="text-gray-500 text-sm mt-1">Permintaan bantuan biaya dari alumni.</p>
+        <h1 className="font-serif text-4xl font-bold text-white">Permintaan Anggota</h1>
+        <p className="text-gray-500 text-sm mt-1">Keringanan iuran dan kebutuhan khusus alumni.</p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-        {([
-          { key: 'all',      label: 'Total',     color: 'text-white'  },
-          { key: 'pending',  label: 'Menunggu',  color: 'text-yellow-400' },
-          { key: 'approved', label: 'Disetujui', color: 'text-green-400'  },
-          { key: 'rejected', label: 'Ditolak',   color: 'text-red-400'    },
-        ] as const).map(s => (
-          <div key={s.key} className="glass rounded-xl p-4 text-center">
-            <p className={`text-2xl font-bold font-serif ${s.color}`}>{counts[s.key]}</p>
-            <p className="text-xs uppercase tracking-widest text-gray-500 mt-1">{s.label}</p>
+      {/* Page-level tabs */}
+      <div className="flex gap-1 mb-8 border-b border-white/10 pb-0">
+        <button
+          onClick={() => setPageTab('keringanan')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-all -mb-px ${
+            pageTab === 'keringanan'
+              ? 'border-gold text-gold'
+              : 'border-transparent text-gray-500 hover:text-white'
+          }`}
+        >
+          <HeartHandshake size={15} />
+          Keringanan
+          {counts.pending > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 text-[10px] font-bold">
+              {counts.pending}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setPageTab('khusus')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-all -mb-px ${
+            pageTab === 'khusus'
+              ? 'border-gold text-gold'
+              : 'border-transparent text-gray-500 hover:text-white'
+          }`}
+        >
+          <Sparkles size={15} />
+          Kebutuhan Khusus
+          {specialList.length > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-gold/15 text-gold text-[10px] font-bold">
+              {specialList.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── Keringanan tab ── */}
+      {pageTab === 'keringanan' && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+            {([
+              { key: 'all',      label: 'Total',     color: 'text-white'  },
+              { key: 'pending',  label: 'Menunggu',  color: 'text-yellow-400' },
+              { key: 'approved', label: 'Disetujui', color: 'text-green-400'  },
+              { key: 'rejected', label: 'Ditolak',   color: 'text-red-400'    },
+            ] as const).map(s => (
+              <div key={s.key} className="glass rounded-xl p-4 text-center">
+                <p className={`text-2xl font-bold font-serif ${s.color}`}>{counts[s.key]}</p>
+                <p className="text-xs uppercase tracking-widest text-gray-500 mt-1">{s.label}</p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 flex-wrap mb-6">
-        {tabs.map(t => (
-          <button key={t} onClick={() => setFilter(t)}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
-              filter === t
-                ? 'bg-gold/15 text-gold border border-gold/30'
-                : 'text-gray-500 hover:text-white border border-white/5 hover:border-white/15'
-            }`}>
-            {t === 'all' ? 'Semua' : STATUS_LABEL[t]}
-            {counts[t] > 0 && <span className="ml-1 opacity-60">{counts[t]}</span>}
-          </button>
-        ))}
-      </div>
+          <div className="flex gap-1 flex-wrap mb-6">
+            {statusTabs.map(t => (
+              <button key={t} onClick={() => setFilter(t)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
+                  filter === t
+                    ? 'bg-gold/15 text-gold border border-gold/30'
+                    : 'text-gray-500 hover:text-white border border-white/5 hover:border-white/15'
+                }`}>
+                {t === 'all' ? 'Semua' : STATUS_LABEL[t]}
+                {counts[t] > 0 && <span className="ml-1 opacity-60">{counts[t]}</span>}
+              </button>
+            ))}
+          </div>
 
-      {isLoading ? (
-        <div className="text-center py-24 text-gray-600 text-sm tracking-widest uppercase animate-pulse">Memuat…</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-24 text-gray-600 text-sm tracking-widest uppercase">
-          Belum ada permintaan.
-        </div>
-      ) : (
-        <div className="space-y-4 max-w-2xl">
-          {filtered.map(req => (
-            <div key={req.id}>
-              <RequestCard req={req} />
+          {loadingKer ? (
+            <div className="text-center py-24 text-gray-600 text-sm tracking-widest uppercase animate-pulse">Memuat…</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-24 text-gray-600 text-sm tracking-widest uppercase">Belum ada permintaan.</div>
+          ) : (
+            <div className="space-y-4 max-w-2xl">
+              {filtered.map(req => <div key={req.id}><RequestCard req={req} /></div>)}
             </div>
-          ))}
-        </div>
+          )}
+        </>
+      )}
+
+      {/* ── Kebutuhan Khusus tab ── */}
+      {pageTab === 'khusus' && (
+        <>
+          <div className="glass rounded-xl p-4 mb-6 inline-flex items-center gap-3">
+            <Sparkles size={16} className="text-gold/70" />
+            <p className="text-sm text-gray-300">
+              <span className="font-bold text-white">{specialList.length}</span> anggota memiliki kebutuhan khusus
+            </p>
+          </div>
+
+          {loadingKhusus ? (
+            <div className="text-center py-24 text-gray-600 text-sm tracking-widest uppercase animate-pulse">Memuat…</div>
+          ) : specialList.length === 0 ? (
+            <div className="text-center py-24 text-gray-600 text-sm tracking-widest uppercase">Belum ada permintaan khusus.</div>
+          ) : (
+            <div className="space-y-4 max-w-2xl">
+              {specialList.map(m => <div key={m.id}><SpecialNeedsCard member={m} /></div>)}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

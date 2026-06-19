@@ -46,6 +46,7 @@ export const qk = {
   // Keringanan (financial assistance)
   myKeringanan:     (profileId: string)                     => ['keringanan', 'my', profileId]                as const,
   allKeringanan:    ()                                      => ['keringanan', 'all']                          as const,
+  specialNeeds:     ()                                      => ['special-needs']                               as const,
   // Payment summary report
   paymentSummary:   (isSuperAdmin: boolean, ids: string[]) => ['admin', 'payment-summary', isSuperAdmin, ...ids] as const,
   // Member iuran ledger status
@@ -1439,6 +1440,25 @@ export async function updateKeringananStatus(
     .update({ status, admin_notes: adminNotes ?? null, updated_at: new Date().toISOString() })
     .eq('id', id);
   if (error) throw error;
+}
+
+export interface SpecialNeedsProfile {
+  id: string;
+  name: string | null;
+  special_needs: string;
+  whatsapp: string | null;
+  phone: string | null;
+}
+
+export async function fetchSpecialNeeds(): Promise<SpecialNeedsProfile[]> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, name, special_needs, whatsapp, phone')
+    .eq('status', 'approved')
+    .not('special_needs', 'is', null)
+    .order('name');
+  if (error) throw error;
+  return (data ?? []) as SpecialNeedsProfile[];
 }
 
 // ─── Generic site setting ─────────────────────────────────────────────────────
