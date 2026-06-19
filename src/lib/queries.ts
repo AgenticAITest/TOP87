@@ -52,6 +52,10 @@ export const qk = {
   memberIuranPaid:  (profileId: string)                    => ['member-iuran-paid', profileId]                   as const,
   // Kaos (t-shirt) report
   kaosReport:       (isSuperAdmin: boolean, ids: string[]) => ['admin', 'kaos-report', isSuperAdmin, ...ids]      as const,
+  // Expenses
+  expenseCategories: ()                                    => ['expense-categories']                               as const,
+  expenses:          ()                                    => ['expenses']                                         as const,
+  adminExpenses:     ()                                    => ['admin', 'expenses']                                as const,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1453,6 +1457,120 @@ export async function setSiteSetting(key: string, value: string): Promise<void> 
     .from('site_settings')
     .upsert({ key, value }, { onConflict: 'key' });
   if (error) throw error;
+}
+
+// ─── Expenses ─────────────────────────────────────────────────────────────────
+
+export interface ExpenseCategory {
+  id:         string;
+  name:       string;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface Expense {
+  id:           string;
+  category_id:  string;
+  category?:    ExpenseCategory;
+  description:  string;
+  amount:       number;
+  expense_date: string;
+  receipt_url:  string | null;
+  notes:        string | null;
+  is_published: boolean;
+  recorded_by:  string | null;
+  created_at:   string;
+}
+
+export async function fetchExpenseCategories(): Promise<ExpenseCategory[]> {
+  const { data, error } = await supabase
+    .from('expense_categories')
+    .select('*')
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as ExpenseCategory[];
+}
+
+export async function addExpenseCategory(name: string): Promise<ExpenseCategory> {
+  const { data: existing } = await supabase
+    .from('expense_categories')
+    .select('sort_order')
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const sort_order = ((existing as any)?.sort_order ?? 0) + 1;
+  const { data, error } = await supabase
+    .from('expense_categories')
+    .insert({ name: name.trim(), sort_order })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as ExpenseCategory;
+}
+
+export async function fetchPublishedExpenses(): Promise<Expense[]> {
+  const { data, error } = await supabase
+    .from('expenses')
+    .select('*, category:expense_categories(*)')
+    .eq('is_published', true)
+    .order('expense_date', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((e: any) => ({ ...e, amount: Number(e.amount) })) as Expense[];
+}
+
+export async function fetchAdminExpenses(): Promise<Expense[]> {
+  const { data, error } = await supabase
+    .from('expenses')
+    .select('*, category:expense_categories(*)')
+    .order('expense_date', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((e: any) => ({ ...e, amount: Number(e.amount) })) as Expense[];
+}
+
+export async function saveExpense(expense: {
+  category_id:  string;
+  description:  string;
+  amount:       number;
+  expense_date: string;
+  receipt_url:  string | null;
+  notes:        string | null;
+  is_published: boolean;
+  recorded_by:  string;
+}): Promise<void> {
+  const { error } = await supabase.from('expenses').insert(expense);
+  if (error) throw error;
+}
+
+export async function updateExpense(id: string, patch: Partial<{
+  category_id:  string;
+  description:  string;
+  amount:       number;
+  expense_date: string;
+  receipt_url:  string | null;
+  notes:        string | null;
+  is_published: boolean;
+}>): Promise<void> {
+  const { error } = await supabase
+    .from('expenses')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteExpense(id: string): Promise<void> {
+  const { error } = await supabase.from('expenses').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function uploadReceipt(file: File): Promise<string> {
+  const ext  = file.name.split('.').pop() ?? 'jpg';
+  const path = `${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from('receipts')
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw error;
+  const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(path);
+  return publicUrl;
 }
 
 // ─── Kaos (T-shirt) Report ────────────────────────────────────────────────────

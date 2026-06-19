@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAdminBackdrop, qk } from '../lib/queries';
 import { Outlet, NavLink, Link, Navigate } from 'react-router-dom';
-import { Users, Image, LayoutDashboard, FileText, Globe, ChevronRight, ChevronLeft, ChevronDown, LogOut, BookOpen, ShieldCheck, PenSquare, CreditCard, ShoppingBag, Package, BarChart3, CircleHelp, Sun, Moon, Landmark, Building2, HeartHandshake } from 'lucide-react';
+import { Users, Image, LayoutDashboard, FileText, Globe, ChevronRight, ChevronLeft, ChevronDown, LogOut, BookOpen, ShieldCheck, PenSquare, CreditCard, ShoppingBag, Package, BarChart3, CircleHelp, Sun, Moon, Landmark, Building2, HeartHandshake, Receipt } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminStatus } from '../hooks/useAdminStatus';
 import { useTheme } from '../contexts/ThemeContext';
@@ -28,6 +28,7 @@ const superAdminLinks = [
   { to: '/admin/bank-rekon',  label: 'Bank Rekon',     icon: Landmark,      end: false },
   { to: '/admin/financial',   label: 'Lap. Keuangan',  icon: BarChart3,     end: false },
   { to: '/admin/keringanan',  label: 'Keringanan',     icon: HeartHandshake,end: false },
+  { to: '/admin/expenses',    label: 'Pengeluaran',    icon: Receipt,       end: false },
 ];
 
 const financeOnlyLinks = [
