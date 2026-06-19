@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { qk, fetchMemberships, fetchApprovedMembers, fetchFriends, saveFriends, fetchMyKeringanan, submitKeringanan } from '../lib/queries';
+import { qk, fetchMemberships, fetchApprovedMembers, fetchFriends, saveFriends, fetchMyKeringanan, submitKeringanan, resubmitKeringanan } from '../lib/queries';
 
 const ATTENDANCE_OPTIONS = [
   { value: 'yes',       label: 'Hadir',             color: 'text-green-700 bg-green-50 border-green-300' },
@@ -26,8 +26,9 @@ export default function MyProfile() {
   const queryClient = useQueryClient();
   const [retrying, setRetrying] = useState(false);
   const [showSizeChart, setShowSizeChart] = useState(false);
-  const [showKeringanan, setShowKeringanan] = useState(false);
-  const [keringananForm, setKeringananForm] = useState({ contact_number: '', jumlah_sanggup: '', alasan: '' });
+  const [showKeringanan, setShowKeringanan]   = useState(false);
+  const [showResubmit,   setShowResubmit]     = useState(false);
+  const [keringananForm, setKeringananForm]   = useState({ contact_number: '', jumlah_sanggup: '', alasan: '' });
   const [keringananSuccess, setKeringananSuccess] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -182,6 +183,20 @@ export default function MyProfile() {
       alasan:        keringananForm.alasan,
     }),
     onSuccess: () => {
+      setKeringananSuccess(true);
+      queryClient.invalidateQueries({ queryKey: qk.myKeringanan(user!.id) });
+    },
+  });
+
+  const resubmitMutation = useMutation({
+    mutationFn: (id: string) => resubmitKeringanan({
+      id,
+      contactNumber: keringananForm.contact_number,
+      jumlahSanggup: parseInt(keringananForm.jumlah_sanggup, 10) || 0,
+      alasan:        keringananForm.alasan,
+    }),
+    onSuccess: () => {
+      setShowResubmit(false);
       setKeringananSuccess(true);
       queryClient.invalidateQueries({ queryKey: qk.myKeringanan(user!.id) });
     },
@@ -480,7 +495,7 @@ export default function MyProfile() {
 
           {/* ── Kebutuhan & Permintaan Khusus ── */}
           <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
-            <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-3">Kebutuhan &amp; Permintaan Khusus</p>
+            <p className="text-[10px] uppercase tracking-widest text-amber-700 mb-3 font-semibold">Kebutuhan &amp; Permintaan Khusus</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 
               {/* Card: Kebutuhan Khusus */}
@@ -511,17 +526,55 @@ export default function MyProfile() {
                   </div>
                 </div>
 
-                {myKeringanan ? (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-3 flex-1">
-                    <p className="text-[10px] uppercase tracking-widest text-amber-600 mb-1.5">Permintaan Terkirim</p>
+                {myKeringanan && myKeringanan.status !== 'rejected' ? (
+                  /* pending or approved — read-only */
+                  <div className={`rounded-lg px-3 py-3 flex-1 border ${
+                    myKeringanan.status === 'approved'
+                      ? 'bg-green-50 border-green-200'
+                      : 'bg-amber-50 border-amber-200'
+                  }`}>
+                    <p className={`text-[10px] uppercase tracking-widest mb-1.5 font-semibold ${
+                      myKeringanan.status === 'approved' ? 'text-green-600' : 'text-amber-600'
+                    }`}>
+                      {myKeringanan.status === 'approved' ? 'Disetujui' : 'Menunggu Review'}
+                    </p>
                     <p className="text-xs text-gray-700"><span className="font-medium">Sanggup:</span> Rp {myKeringanan.jumlah_sanggup.toLocaleString('id-ID')}</p>
                     <p className="text-xs text-gray-700 mt-1 line-clamp-3"><span className="font-medium">Alasan:</span> {myKeringanan.alasan}</p>
-                    <p className="text-[10px] text-gray-400 mt-2">Status: <span className="font-semibold">{myKeringanan.status === 'pending' ? 'Menunggu review' : myKeringanan.status}</span></p>
+                    {myKeringanan.admin_notes && (
+                      <p className="text-xs text-gray-500 mt-1 italic">Catatan: {myKeringanan.admin_notes}</p>
+                    )}
                   </div>
-                ) : showKeringanan ? (
+
+                ) : myKeringanan && myKeringanan.status === 'rejected' && !showResubmit ? (
+                  /* rejected — show reason + re-submit prompt */
+                  <div className="flex flex-col gap-2 flex-1">
+                    <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-3">
+                      <p className="text-[10px] uppercase tracking-widest text-red-500 font-semibold mb-1.5">Ditolak</p>
+                      <p className="text-xs text-gray-700 line-clamp-3"><span className="font-medium">Alasan kamu:</span> {myKeringanan.alasan}</p>
+                      {myKeringanan.admin_notes && (
+                        <p className="text-xs text-red-600 mt-1.5 italic">Catatan panitia: {myKeringanan.admin_notes}</p>
+                      )}
+                    </div>
+                    <button type="button"
+                      onClick={() => {
+                        setShowResubmit(true);
+                        setKeringananSuccess(false);
+                        setKeringananForm({
+                          contact_number: profile.whatsapp ?? profile.phone ?? '',
+                          jumlah_sanggup: String(myKeringanan.jumlah_sanggup || ''),
+                          alasan:         myKeringanan.alasan,
+                        });
+                      }}
+                      className="flex items-center gap-2 text-sm text-gold border border-gold/30 bg-amber-50 hover:bg-amber-100 transition-colors px-4 py-2 rounded-lg font-medium self-start">
+                      <HeartHandshake size={14} />
+                      Ajukan Ulang
+                    </button>
+                  </div>
+
+                ) : (myKeringanan?.status === 'rejected' && showResubmit) || showKeringanan ? (
                   <div className="flex flex-col gap-2 flex-1">
                     {keringananSuccess ? (
-                      <p className="text-green-600 text-sm">Permintaan berhasil dikirim. Terima kasih.</p>
+                      <p className="text-green-600 text-sm font-medium">Permintaan berhasil dikirim. Terima kasih.</p>
                     ) : (
                       <>
                         <input type="tel"
@@ -543,18 +596,26 @@ export default function MyProfile() {
                           className="w-full bg-white border border-amber-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-gold/50 transition-colors resize-none"
                           placeholder="Alasan permohonan…"
                         />
-                        {keringananMutation.isError && (
-                          <p className="text-red-400 text-xs">{(keringananMutation.error as Error).message}</p>
+                        {(keringananMutation.isError || resubmitMutation.isError) && (
+                          <p className="text-red-400 text-xs">
+                            {((keringananMutation.error ?? resubmitMutation.error) as Error).message}
+                          </p>
                         )}
                         <div className="flex gap-2">
                           <button type="button"
-                            onClick={() => keringananMutation.mutate()}
-                            disabled={keringananMutation.isPending || !keringananForm.alasan.trim()}
+                            onClick={() => showResubmit && myKeringanan
+                              ? resubmitMutation.mutate(myKeringanan.id)
+                              : keringananMutation.mutate()
+                            }
+                            disabled={(keringananMutation.isPending || resubmitMutation.isPending) || !keringananForm.alasan.trim()}
                             className="btn-primary flex items-center gap-1.5 py-2 px-4 rounded-lg text-xs font-bold uppercase tracking-widest disabled:opacity-50">
-                            {keringananMutation.isPending ? <Loader size={12} className="animate-spin" /> : <HeartHandshake size={12} />}
-                            {keringananMutation.isPending ? 'Mengirim…' : 'Kirim'}
+                            {(keringananMutation.isPending || resubmitMutation.isPending)
+                              ? <Loader size={12} className="animate-spin" />
+                              : <HeartHandshake size={12} />}
+                            {(keringananMutation.isPending || resubmitMutation.isPending) ? 'Mengirim…' : 'Kirim'}
                           </button>
-                          <button type="button" onClick={() => setShowKeringanan(false)}
+                          <button type="button"
+                            onClick={() => showResubmit ? setShowResubmit(false) : setShowKeringanan(false)}
                             className="px-3 py-2 rounded-lg text-xs text-gray-500 hover:text-gray-700 border border-amber-200 transition-colors">
                             Batal
                           </button>

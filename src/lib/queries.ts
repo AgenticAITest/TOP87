@@ -1421,6 +1421,26 @@ export async function submitKeringanan(req: {
   if (error) throw error;
 }
 
+export async function resubmitKeringanan(req: {
+  id:            string;
+  contactNumber: string;
+  jumlahSanggup: number;
+  alasan:        string;
+}): Promise<void> {
+  const { error } = await supabase
+    .from('keringanan_requests')
+    .update({
+      contact_number: req.contactNumber,
+      jumlah_sanggup: req.jumlahSanggup,
+      alasan:         req.alasan,
+      status:         'pending',
+      admin_notes:    null,
+      updated_at:     new Date().toISOString(),
+    })
+    .eq('id', req.id);
+  if (error) throw error;
+}
+
 export async function fetchAllKeringanan(): Promise<KeringananRequest[]> {
   const { data, error } = await supabase
     .from('keringanan_requests')
