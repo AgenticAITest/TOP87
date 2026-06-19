@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   fetchExpenseCategories, fetchAdminExpenses,
-  addExpenseCategory, saveExpense, updateExpense, deleteExpense, uploadReceipt,
+  addExpenseCategory, deleteExpenseCategory, saveExpense, updateExpense, deleteExpense, uploadReceipt,
   qk, type ExpenseCategory, type Expense,
 } from '../../lib/queries';
 
@@ -278,6 +278,19 @@ export default function AdminExpenses() {
     },
   });
 
+  const [deleteCatError, setDeleteCatError] = useState('');
+  const deleteCatMutation = useMutation({
+    mutationFn: deleteExpenseCategory,
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: qk.expenseCategories() });
+      if (categoryFilter === id) setCategoryFilter('all');
+      setDeleteCatError('');
+    },
+    onError: () => {
+      setDeleteCatError('Kategori ini masih memiliki pengeluaran. Hapus atau pindahkan dulu semua itemnya.');
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: deleteExpense,
     onSuccess: () => {
@@ -364,14 +377,25 @@ export default function AdminExpenses() {
           Semua ({expenses.length})
         </button>
         {categories.map(c => (
-          <button key={c.id} onClick={() => setCategoryFilter(c.id)}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
-              categoryFilter === c.id
-                ? 'bg-gold/15 text-gold border border-gold/30'
-                : 'text-gray-500 border border-white/10 hover:text-white hover:border-white/20'
-            }`}>
-            {c.name} ({countForCategory(c.id)})
-          </button>
+          <div key={c.id} className="group relative flex items-center">
+            <button onClick={() => setCategoryFilter(c.id)}
+              className={`pl-4 pr-7 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
+                categoryFilter === c.id
+                  ? 'bg-gold/15 text-gold border border-gold/30'
+                  : 'text-gray-500 border border-white/10 hover:text-white hover:border-white/20'
+              }`}>
+              {c.name} ({countForCategory(c.id)})
+            </button>
+            <button
+              onClick={() => {
+                if (!confirm(`Hapus kategori "${c.name}"?`)) return;
+                deleteCatMutation.mutate(c.id);
+              }}
+              title="Hapus kategori"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center rounded-full text-gray-600 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all">
+              <X size={9} />
+            </button>
+          </div>
         ))}
 
         {/* Add category */}
@@ -399,6 +423,12 @@ export default function AdminExpenses() {
           </button>
         )}
       </div>
+
+      {deleteCatError && (
+        <p className="text-red-400 text-xs mb-4 flex items-center gap-2">
+          <X size={12} /> {deleteCatError}
+        </p>
+      )}
 
       {/* Expense list */}
       {catLoading || expLoading ? (

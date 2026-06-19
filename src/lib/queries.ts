@@ -1491,6 +1491,11 @@ export async function fetchExpenseCategories(): Promise<ExpenseCategory[]> {
   return (data ?? []) as ExpenseCategory[];
 }
 
+export async function deleteExpenseCategory(id: string): Promise<void> {
+  const { error } = await supabase.from('expense_categories').delete().eq('id', id);
+  if (error) throw error;
+}
+
 export async function addExpenseCategory(name: string): Promise<ExpenseCategory> {
   const { data: existing } = await supabase
     .from('expense_categories')
