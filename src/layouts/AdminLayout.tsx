@@ -27,7 +27,7 @@ const superAdminLinks = [
   { to: '/admin/orders',      label: 'Pesanan',        icon: Package,       end: false },
   { to: '/admin/bank-rekon',  label: 'Bank Rekon',     icon: Landmark,      end: false },
   { to: '/admin/financial',   label: 'Lap. Keuangan',  icon: BarChart3,     end: false },
-  { to: '/admin/keringanan',  label: 'Keringanan',     icon: HeartHandshake,end: false },
+  { to: '/admin/keringanan',  label: 'Permintaan Anggota', icon: HeartHandshake, end: false },
   { to: '/admin/expenses',    label: 'Pengeluaran',    icon: Receipt,       end: false },
 ];
 
