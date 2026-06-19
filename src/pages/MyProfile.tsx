@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect, FormEvent, ChangeEvent } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Save, Camera, Loader, RefreshCw, UserPlus, X, Search, Ruler } from 'lucide-react';
+import { ShieldCheck, Save, Camera, Loader, RefreshCw, UserPlus, X, Search, Ruler, HeartHandshake } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { qk, fetchMemberships, fetchApprovedMembers, fetchFriends, saveFriends } from '../lib/queries';
+import { qk, fetchMemberships, fetchApprovedMembers, fetchFriends, saveFriends, fetchMyKeringanan, submitKeringanan } from '../lib/queries';
 
 const ATTENDANCE_OPTIONS = [
   { value: 'yes',       label: 'Hadir',             color: 'text-green-700 bg-green-50 border-green-300' },
@@ -26,6 +26,9 @@ export default function MyProfile() {
   const queryClient = useQueryClient();
   const [retrying, setRetrying] = useState(false);
   const [showSizeChart, setShowSizeChart] = useState(false);
+  const [showKeringanan, setShowKeringanan] = useState(false);
+  const [keringananForm, setKeringananForm] = useState({ contact_number: '', jumlah_sanggup: '', alasan: '' });
+  const [keringananSuccess, setKeringananSuccess] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: memberships = [] } = useQuery({
@@ -62,6 +65,7 @@ export default function MyProfile() {
     funny_event:        profile?.funny_event ?? '',
     message_to_friends: profile?.message_to_friends ?? '',
     tshirt_size:        profile?.tshirt_size ?? '',
+    special_needs:      profile?.special_needs ?? '',
   });
   const [saved, setSaved] = useState(false);
   const formKey = profile?.id ?? 'none';
@@ -130,6 +134,7 @@ export default function MyProfile() {
         funny_event:        f.funny_event || null,
         message_to_friends: f.message_to_friends || null,
         tshirt_size:        f.tshirt_size || null,
+        special_needs:      f.special_needs || null,
         updated_at:         new Date().toISOString(),
       }).eq('id', user!.id);
       if (error) throw error;
@@ -156,6 +161,29 @@ export default function MyProfile() {
     onSuccess: () => {
       refreshProfile();
       queryClient.invalidateQueries({ queryKey: qk.members() });
+    },
+  });
+
+  // ── Keringanan query + mutation ───────────────────────────────────────────
+  const { data: myKeringanan } = useQuery({
+    queryKey: qk.myKeringanan(user?.id ?? ''),
+    queryFn:  () => fetchMyKeringanan(user!.id),
+    enabled:  !!user,
+    staleTime: 0,
+  });
+
+  const keringananMutation = useMutation({
+    mutationFn: () => submitKeringanan({
+      profileId:     user!.id,
+      name:          profile!.name ?? '',
+      contactNumber: keringananForm.contact_number,
+      email:         user?.email ?? '',
+      jumlahSanggup: parseInt(keringananForm.jumlah_sanggup, 10) || 0,
+      alasan:        keringananForm.alasan,
+    }),
+    onSuccess: () => {
+      setKeringananSuccess(true);
+      queryClient.invalidateQueries({ queryKey: qk.myKeringanan(user!.id) });
     },
   });
 
@@ -301,6 +329,7 @@ export default function MyProfile() {
             funny_event:        profile.funny_event ?? '',
             message_to_friends: profile.message_to_friends ?? '',
             tshirt_size:        profile.tshirt_size ?? '',
+            special_needs:      profile.special_needs ?? '',
           }); }}>
 
           {/* ── Full Name + Nickname ── */}
@@ -449,6 +478,17 @@ export default function MyProfile() {
             </div>
           </div>
 
+          {/* ── Permintaan Khusus ── */}
+          <div>
+            <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Permintaan Khusus</label>
+            <textarea value={form.special_needs}
+              onChange={e => setForm(f => ({ ...f, special_needs: e.target.value }))}
+              rows={3}
+              className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors resize-none"
+              placeholder="Ceritakan kebutuhan khusus kamu, misalnya kamar non-smoking, akses disabilitas, pantangan makanan tertentu, dll." />
+            <p className="text-[11px] text-gray-400 mt-1.5">Panitia akan berusaha mengakomodasi sesuai kemampuan.</p>
+          </div>
+
           {updateMutation.isError && (
             <p className="text-red-400 text-sm">{(updateMutation.error as Error).message}</p>
           )}
@@ -553,6 +593,95 @@ export default function MyProfile() {
             {friendsMutation.isPending ? <Loader size={14} className="animate-spin" /> : <Save size={14} />}
             {friendsMutation.isPending ? 'Menyimpan…' : 'Simpan Sahabat'}
           </button>
+        </div>
+
+        {/* ── Permintaan Keringanan ── */}
+        <div className="mt-6 glass-card p-6 rounded-xl shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <HeartHandshake size={18} className="text-gold/70" />
+            <div>
+              <p className="text-xs uppercase tracking-widest text-gray-400">Permintaan Keringanan</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">Ajukan keringanan iuran jika diperlukan</p>
+            </div>
+          </div>
+
+          {myKeringanan ? (
+            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-4">
+              <p className="text-xs uppercase tracking-widest text-amber-600 mb-2">Permintaan Terkirim</p>
+              <p className="text-sm text-gray-700"><span className="font-medium">Jumlah sanggup:</span> Rp {myKeringanan.jumlah_sanggup.toLocaleString('id-ID')}</p>
+              <p className="text-sm text-gray-700 mt-1"><span className="font-medium">Alasan:</span> {myKeringanan.alasan}</p>
+              <p className="text-[11px] text-gray-400 mt-2">
+                Status: <span className="font-semibold capitalize">{myKeringanan.status === 'pending' ? 'Menunggu review' : myKeringanan.status}</span>
+              </p>
+            </div>
+          ) : showKeringanan ? (
+            <div className="mt-4 space-y-3">
+              {keringananSuccess ? (
+                <p className="text-green-600 text-sm font-medium">Permintaan keringanan berhasil dikirim. Terima kasih.</p>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1.5">No. Kontak (WA/HP)</label>
+                    <input type="tel"
+                      value={keringananForm.contact_number}
+                      onChange={e => setKeringananForm(f => ({ ...f, contact_number: e.target.value }))}
+                      className="w-full bg-white border border-amber-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-gold/50 transition-colors"
+                      placeholder="+62 812 …"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1.5">Jumlah yang Sanggup Dibayar (Rp)</label>
+                    <input type="number" min={0}
+                      value={keringananForm.jumlah_sanggup}
+                      onChange={e => setKeringananForm(f => ({ ...f, jumlah_sanggup: e.target.value }))}
+                      className="w-full bg-white border border-amber-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-gold/50 transition-colors"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1.5">Alasan Permohonan</label>
+                    <textarea
+                      value={keringananForm.alasan}
+                      onChange={e => setKeringananForm(f => ({ ...f, alasan: e.target.value }))}
+                      rows={3}
+                      className="w-full bg-white border border-amber-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-gold/50 transition-colors resize-none"
+                      placeholder="Ceritakan kondisi kamu…"
+                    />
+                  </div>
+                  {keringananMutation.isError && (
+                    <p className="text-red-400 text-sm">{(keringananMutation.error as Error).message}</p>
+                  )}
+                  <div className="flex gap-3">
+                    <button type="button"
+                      onClick={() => keringananMutation.mutate()}
+                      disabled={keringananMutation.isPending || !keringananForm.alasan.trim()}
+                      className="btn-primary flex items-center gap-2 font-bold py-2.5 px-6 rounded-xl text-xs uppercase tracking-widest disabled:opacity-50">
+                      {keringananMutation.isPending ? <Loader size={14} className="animate-spin" /> : <HeartHandshake size={14} />}
+                      {keringananMutation.isPending ? 'Mengirim…' : 'Kirim Permintaan'}
+                    </button>
+                    <button type="button"
+                      onClick={() => setShowKeringanan(false)}
+                      className="px-4 py-2.5 rounded-xl text-xs text-gray-500 hover:text-gray-700 border border-amber-200 hover:border-amber-300 transition-colors">
+                      Batal
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <button type="button"
+              onClick={() => {
+                setShowKeringanan(true);
+                setKeringananForm(f => ({
+                  ...f,
+                  contact_number: profile.whatsapp ?? profile.phone ?? f.contact_number,
+                }));
+              }}
+              className="mt-4 flex items-center gap-2 text-sm text-gold border border-gold/30 bg-amber-50 hover:bg-amber-100 transition-colors px-5 py-2.5 rounded-xl font-medium">
+              <HeartHandshake size={16} />
+              Ajukan Keringanan Iuran
+            </button>
+          )}
         </div>
 
       </div>

@@ -21,6 +21,7 @@ export interface Profile {
   funny_event: string | null;
   message_to_friends: string | null;
   tshirt_size: string | null;
+  special_needs: string | null;
 }
 
 interface AuthContextType {
