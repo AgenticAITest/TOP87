@@ -79,21 +79,27 @@ export default function PaymentsPage() {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <p className="text-xs uppercase tracking-widest text-gray-500 mb-1">{tabLabel}</p>
-            <p className="text-2xl font-bold font-serif text-gray-900 mb-2">
-              {isLoading ? '—' : formatRp(totalSubmitted)}
-            </p>
-            <div className="flex flex-wrap gap-3 text-[11px]">
-              <span className="flex items-center gap-1 text-green-700">
-                <CheckCircle size={11} />
-                {formatRp(totalConfirmed)} dikonfirmasi
-              </span>
-              {pendingCount > 0 && (
-                <span className="flex items-center gap-1 text-blue-700">
-                  <Clock size={11} />
-                  {pendingCount} menunggu konfirmasi
-                </span>
-              )}
-            </div>
+            {tab === 'reunion_fee' && iuranPaid && filtered.length === 0 ? (
+              <p className="text-sm text-green-700 font-medium mt-1">Dibayarkan oleh member lain</p>
+            ) : (
+              <>
+                <p className="text-2xl font-bold font-serif text-gray-900 mb-2">
+                  {isLoading ? '—' : formatRp(totalSubmitted)}
+                </p>
+                <div className="flex flex-wrap gap-3 text-[11px]">
+                  <span className="flex items-center gap-1 text-green-700">
+                    <CheckCircle size={11} />
+                    {formatRp(totalConfirmed)} dikonfirmasi
+                  </span>
+                  {pendingCount > 0 && (
+                    <span className="flex items-center gap-1 text-blue-700">
+                      <Clock size={11} />
+                      {pendingCount} menunggu konfirmasi
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
           </div>
           {tab === 'reunion_fee' && iuranPaid ? (
             <span className="flex items-center gap-2 py-2.5 px-5 rounded-full font-bold uppercase tracking-widest text-xs whitespace-nowrap shrink-0 bg-green-100 text-green-700 border border-green-200">
@@ -118,9 +124,13 @@ export default function PaymentsPage() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-gray-400 text-sm">
           <CreditCard size={32} className="mx-auto mb-3 opacity-30" />
-          <p className="text-gray-600">Belum ada riwayat {tabLabel.toLowerCase()}.</p>
-          {!(tab === 'reunion_fee' && iuranPaid) && (
-            <p className="text-xs mt-1 text-gray-400">Klik "Bayar Sekarang" untuk melakukan pembayaran.</p>
+          {tab === 'reunion_fee' && iuranPaid ? (
+            <p className="text-gray-600">Iuran dibayarkan oleh member lain.</p>
+          ) : (
+            <>
+              <p className="text-gray-600">Belum ada riwayat {tabLabel.toLowerCase()}.</p>
+              <p className="text-xs mt-1 text-gray-400">Klik "Bayar Sekarang" untuk melakukan pembayaran.</p>
+            </>
           )}
         </div>
       ) : (
