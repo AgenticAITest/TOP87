@@ -57,6 +57,8 @@ export const qk = {
   expenseCategories: ()                                    => ['expense-categories']                               as const,
   expenses:          ()                                    => ['expenses']                                         as const,
   adminExpenses:     ()                                    => ['admin', 'expenses']                                as const,
+  // Media tags (member-added post-upload)
+  mediaTags:         (mediaId: string)                     => ['media-tags', mediaId]                             as const,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -526,12 +528,24 @@ export async function updatePaymentAdmin(
   if (auditErr) console.error('[audit_log] insert failed:', auditErr.message, auditErr.details);
 }
 
+/** Full-iuran target — the "lunas" threshold. Single source: site_settings.reunion_fee_target. */
+export async function fetchReunionFeeTarget(): Promise<number> {
+  const { data } = await supabase
+    .from('site_settings')
+    .select('value')
+    .eq('key', 'reunion_fee_target')
+    .maybeSingle();
+  return parseInt((data as any)?.value ?? '1870000', 10);
+}
+
 export interface MemberPaymentSummary {
   id:              string;
   name:            string | null;
   avatar_url:      string | null;
   primaryCharter:  string | null;
-  iuranAmount:     number | null;   // null = belum bayar
+  iuranAmount:     number | null;   // confirmed amount paid so far; null = belum bayar
+  iuranRequired:   number;          // full-iuran target (lunas threshold)
+  iuranFullyPaid:  boolean;         // true only when confirmed amount >= target
   iuranStatus:     string | null;   // 'confirmed'|'submitted'|'pending_review'|'rejected'|'credited'
   iuranCreditedBy: string | null;   // payer name when status === 'credited'
   donationTotal:   number;          // sum of confirmed donations
@@ -544,6 +558,7 @@ export async function fetchPaymentSummaryReport(
   charterIds: string[],
 ): Promise<MemberPaymentSummary[]> {
   const profileIds = await charterScope(isSuperAdmin, charterIds);
+  const feeTarget  = await fetchReunionFeeTarget();
 
   const mq = supabase
     .from('profiles')
@@ -598,6 +613,12 @@ export async function fetchPaymentSummaryReport(
     donByProfile.set(payerProfileId, (donByProfile.get(payerProfileId) ?? 0) + (t.amount as number));
   }
 
+  // Payment IDs that already have ANY ledger allocation (iuran or donation pool).
+  // Used to avoid double-counting payments that have been explicitly allocated.
+  const allocatedPaymentIds = new Set<string>();
+  for (const t of iuranTxns ?? []) { if ((t as any).payment_id) allocatedPaymentIds.add((t as any).payment_id); }
+  for (const t of donTxns   ?? []) { if ((t as any).payment_id) allocatedPaymentIds.add((t as any).payment_id); }
+
   // Group own payments by profile
   const byProfile = new Map<string, any[]>();
   for (const p of payments ?? []) {
@@ -609,30 +630,36 @@ export async function fetchPaymentSummaryReport(
     const primary = (m.charter_members ?? []).find((cm: any) => cm.is_primary);
     const all     = byProfile.get(m.id) ?? [];
 
-    // Ledger-first: check if there are confirmed allocations for this member's iuran
-    const ledger = iuranLedger.get(m.id);
-
-    // Also check own submitted/pending payments (not yet allocated)
+    const ledger    = iuranLedger.get(m.id);
     const iuranList = all.filter((p: any) => p.type === 'reunion_fee');
+
+    // Unified "paid iuran" rule (identical in Rekap, Kaos, and the member page):
+    //   iuran allocated in the ledger  +  confirmed reunion_fee payments not yet allocated.
+    // Allocated payments are already represented in the ledger, so counting them again here
+    // would double-count; an explicit split that sends little to iuran correctly stays partial.
+    const ledgerIuran = ledger?.amount ?? 0;
+    const unallocatedConfirmed = iuranList
+      .filter((p: any) => p.status === 'confirmed' && !allocatedPaymentIds.has(p.id))
+      .reduce((sum: number, p: any) => sum + (p.admin_adjusted_amount ?? p.member_amount), 0);
+    const paidConfirmed = ledgerIuran + unallocatedConfirmed;
+
+    // Best own non-confirmed payment — for status display when nothing is confirmed yet.
     let bestOwn: any = null;
     for (const s of IURAN_PRIORITY) {
       bestOwn = iuranList.find((p: any) => p.status === s) ?? null;
       if (bestOwn) break;
     }
 
-    // Determine iuran status:
-    // 1. If ledger has entry → confirmed (credited by ledger allocation)
-    // 2. Else use best own payment status
     let iuranStatus:     string | null = null;
     let iuranAmount:     number | null = null;
     let iuranCreditedBy: string | null = null;
 
-    if (ledger) {
+    if (paidConfirmed > 0) {
       iuranStatus = 'confirmed';
-      iuranAmount = ledger.amount;
-      // If there's no own confirmed payment but ledger exists → someone else paid
-      const hasOwnConfirmed = bestOwn?.status === 'confirmed';
-      if (!hasOwnConfirmed) {
+      iuranAmount = paidConfirmed;
+      // Credited when the iuran came from the ledger but the member has no confirmed payment of their own.
+      const hasOwnConfirmed = iuranList.some((p: any) => p.status === 'confirmed');
+      if (ledger && !hasOwnConfirmed) {
         iuranCreditedBy = ledger.payerName;
         iuranStatus     = 'credited';
       }
@@ -641,11 +668,14 @@ export async function fetchPaymentSummaryReport(
       iuranAmount = bestOwn.admin_adjusted_amount ?? bestOwn.member_amount;
     }
 
-    // Donation total: ledger pool entries (allocated portion of any payment)
-    // + standalone donation-type payments not yet in ledger
+    // "Lunas" only when the confirmed amount reaches the full-iuran target.
+    const iuranFullyPaid = feeTarget > 0 && paidConfirmed >= feeTarget;
+
+    // Donation total: ledger pool entries (allocated donation portions)
+    // + confirmed donation-type payments NOT already allocated to the pool (avoids double-count).
     const ledgerDonation = donByProfile.get(m.id) ?? 0;
     const standaloneDonation = all
-      .filter((p: any) => p.type === 'donation' && p.status === 'confirmed')
+      .filter((p: any) => p.type === 'donation' && p.status === 'confirmed' && !allocatedPaymentIds.has(p.id))
       .reduce((sum: number, p: any) => sum + (p.admin_adjusted_amount ?? p.member_amount), 0);
     const donationTotal = ledgerDonation + standaloneDonation;
 
@@ -655,6 +685,8 @@ export async function fetchPaymentSummaryReport(
       avatar_url:      m.avatar_url,
       primaryCharter:  primary?.charters?.name ?? null,
       iuranAmount,
+      iuranRequired:   feeTarget,
+      iuranFullyPaid,
       iuranStatus,
       iuranCreditedBy,
       donationTotal,
@@ -759,16 +791,47 @@ export async function savePaymentAllocations(
   });
 }
 
-// Returns true if the member has at least one credit in their iuran account_transactions
+// True only when the member's iuran reaches the full target. Uses the same unified rule as
+// the admin reports: iuran allocated in the ledger + their own confirmed reunion_fee payments
+// that haven't been allocated yet (so a confirmed-but-unallocated payment still counts, and an
+// explicit split is respected). Partial payers stay false so they can pay the remainder.
 export async function fetchMemberIuranPaid(profileId: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('account_transactions')
-    .select('id, member_accounts!inner(profile_id, account_type)')
-    .eq('member_accounts.profile_id', profileId)
-    .eq('member_accounts.account_type', 'iuran')
-    .limit(1);
-  if (error) throw error;
-  return (data?.length ?? 0) > 0;
+  const target = await fetchReunionFeeTarget();
+  if (target <= 0) return false;
+
+  const [ledgerRes, payRes] = await Promise.all([
+    supabase
+      .from('account_transactions')
+      .select('amount, member_accounts!inner(profile_id, account_type)')
+      .eq('member_accounts.profile_id', profileId)
+      .eq('member_accounts.account_type', 'iuran'),
+    supabase
+      .from('payments')
+      .select('id, member_amount, admin_adjusted_amount')
+      .eq('profile_id', profileId)
+      .eq('type', 'reunion_fee')
+      .eq('status', 'confirmed'),
+  ]);
+  if (ledgerRes.error) throw ledgerRes.error;
+  if (payRes.error)    throw payRes.error;
+
+  const ledgerSum = (ledgerRes.data ?? []).reduce((s: number, r: any) => s + (r.amount ?? 0), 0);
+
+  // Which of this member's confirmed payments are already represented in the ledger
+  const payIds = (payRes.data ?? []).map((p: any) => p.id);
+  let allocatedIds = new Set<string>();
+  if (payIds.length > 0) {
+    const { data: allocRows } = await supabase
+      .from('account_transactions')
+      .select('payment_id')
+      .in('payment_id', payIds);
+    allocatedIds = new Set((allocRows ?? []).map((r: any) => r.payment_id).filter(Boolean));
+  }
+  const unallocatedSum = (payRes.data ?? [])
+    .filter((p: any) => !allocatedIds.has(p.id))
+    .reduce((s: number, p: any) => s + ((p.admin_adjusted_amount ?? p.member_amount) as number), 0);
+
+  return ledgerSum + unallocatedSum >= target;
 }
 
 export async function fetchPaymentTotals(): Promise<{ reunion_fee: number; donation: number }> {
@@ -1481,6 +1544,40 @@ export async function fetchSpecialNeeds(): Promise<SpecialNeedsProfile[]> {
   return (data ?? []) as SpecialNeedsProfile[];
 }
 
+// ─── Media tags (member-added, post-upload) ───────────────────────────────────
+
+export interface MediaTag {
+  id:       string;
+  tag:      string;
+  added_by: string;
+}
+
+export async function fetchMediaTags(mediaId: string): Promise<MediaTag[]> {
+  const { data, error } = await supabase
+    .from('media_tags')
+    .select('id, tag, added_by')
+    .eq('media_id', mediaId)
+    .order('created_at');
+  if (error) throw error;
+  return (data ?? []) as MediaTag[];
+}
+
+export async function addMediaTag(mediaId: string, tag: string, userId: string): Promise<void> {
+  const normalized = tag.trim().toLowerCase().replace(/[^a-z0-9_\-]/g, '');
+  if (!normalized) return;
+  const { error } = await supabase.from('media_tags').insert({
+    media_id: mediaId,
+    tag:      normalized,
+    added_by: userId,
+  });
+  if (error && error.code !== '23505') throw error; // ignore unique-violation
+}
+
+export async function removeMediaTag(id: string): Promise<void> {
+  const { error } = await supabase.from('media_tags').delete().eq('id', id);
+  if (error) throw error;
+}
+
 // ─── Generic site setting ─────────────────────────────────────────────────────
 
 export async function fetchSiteSetting(key: string): Promise<string> {
@@ -1642,19 +1739,51 @@ export async function fetchKaosReport(
   const { data: members, error: mErr } = profileIds ? await mq.in('id', profileIds) : await mq;
   if (mErr) throw mErr;
 
-  let pq = supabase.from('payments').select('profile_id').eq('type', 'reunion_fee').eq('status', 'confirmed');
+  const feeTarget = await fetchReunionFeeTarget();
+
+  // Confirmed reunion_fee payments (raw)
+  let pq = supabase.from('payments')
+    .select('id, profile_id, member_amount, admin_adjusted_amount')
+    .eq('type', 'reunion_fee').eq('status', 'confirmed');
   if (profileIds) pq = pq.in('profile_id', profileIds);
   const { data: paidData } = await pq;
-  const paidSet = new Set((paidData ?? []).map((p: any) => p.profile_id as string));
+
+  // Iuran ledger allocations per member (covers payments split or credited by someone else)
+  const { data: iuranTxns } = await supabase
+    .from('account_transactions')
+    .select('amount, member_accounts!inner(profile_id, account_type)')
+    .eq('member_accounts.account_type', 'iuran')
+    .not('member_accounts.profile_id', 'is', null);
+  // Payment IDs already allocated anywhere in the ledger (avoid double-counting)
+  const { data: allocTxns } = await supabase
+    .from('account_transactions')
+    .select('payment_id');
+  const allocatedPaymentIds = new Set((allocTxns ?? []).map((r: any) => r.payment_id).filter(Boolean));
+
+  const ledgerByMember = new Map<string, number>();
+  for (const t of iuranTxns ?? []) {
+    const pid = (t as any).member_accounts?.profile_id;
+    if (!pid) continue;
+    ledgerByMember.set(pid, (ledgerByMember.get(pid) ?? 0) + (t.amount as number));
+  }
+
+  // Unified rule: iuran ledger + confirmed reunion_fee payments not yet allocated.
+  const unallocByMember = new Map<string, number>();
+  for (const p of paidData ?? []) {
+    if (allocatedPaymentIds.has((p as any).id)) continue;
+    const amt = ((p as any).admin_adjusted_amount ?? (p as any).member_amount) as number;
+    unallocByMember.set(p.profile_id, (unallocByMember.get(p.profile_id) ?? 0) + amt);
+  }
 
   return (members ?? []).map((m: any) => {
     const primary = (m.charter_members ?? []).find((cm: any) => cm.is_primary) ?? (m.charter_members ?? [])[0];
+    const paid = (ledgerByMember.get(m.id) ?? 0) + (unallocByMember.get(m.id) ?? 0);
     return {
       profile_id:   m.id,
       name:         m.name,
       charter_name: primary?.charters?.name ?? null,
       tshirt_size:  m.tshirt_size,
-      iuran_paid:   paidSet.has(m.id),
+      iuran_paid:   feeTarget > 0 && paid >= feeTarget,
     };
   });
 }

@@ -395,7 +395,8 @@ function RekapTable({ rows, isLoading }: { rows: MemberPaymentSummary[]; isLoadi
   const totals = useMemo(() => ({
     iuranConfirmed: rows.filter(r => r.iuranStatus === 'confirmed').reduce((s, r) => s + (r.iuranAmount ?? 0), 0),
     donasi:         rows.reduce((s, r) => s + r.donationTotal, 0),
-    sudahBayar:     rows.filter(r => r.iuranStatus === 'confirmed' || r.iuranStatus === 'credited').length,
+    lunas:          rows.filter(r => r.iuranFullyPaid).length,
+    cicilan:        rows.filter(r => !r.iuranFullyPaid && (r.iuranStatus === 'confirmed' || r.iuranStatus === 'credited')).length,
     belumBayar:     rows.filter(r => !r.iuranStatus).length,
   }), [rows]);
 
@@ -408,7 +409,10 @@ function RekapTable({ rows, isLoading }: { rows: MemberPaymentSummary[]; isLoadi
       {/* Summary chips */}
       <div className="flex flex-wrap gap-2 text-xs">
         <span className="px-3 py-1.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20">
-          {totals.sudahBayar} iuran terlunasi
+          {totals.lunas} iuran lunas
+        </span>
+        <span className="px-3 py-1.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+          {totals.cicilan} cicilan
         </span>
         <span className="px-3 py-1.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
           {totals.belumBayar} belum bayar
@@ -461,7 +465,12 @@ function RekapTable({ rows, isLoading }: { rows: MemberPaymentSummary[]; isLoadi
                   {r.iuranStatus === 'credited'
                     ? <span className="text-purple-400 font-medium text-xs">via kredit</span>
                     : r.iuranAmount != null
-                      ? <span className="text-white font-medium">{formatRp(r.iuranAmount)}</span>
+                      ? <div>
+                          <span className="text-white font-medium">{formatRp(r.iuranAmount)}</span>
+                          {r.iuranStatus === 'confirmed' && !r.iuranFullyPaid && (
+                            <p className="text-[9px] text-gray-600 mt-0.5">dari {formatRp(r.iuranRequired)}</p>
+                          )}
+                        </div>
                       : <span className="text-gray-600 italic text-xs">Belum bayar</span>
                   }
                 </td>
@@ -473,11 +482,19 @@ function RekapTable({ rows, isLoading }: { rows: MemberPaymentSummary[]; isLoadi
                         </span>
                         <p className="text-[9px] text-gray-600 mt-0.5 pl-0.5">oleh {r.iuranCreditedBy}</p>
                       </div>
-                    : r.iuranStatus
-                      ? <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${STATUS_COLORS[r.iuranStatus] ?? ''}`}>
-                          {STATUS_LABELS[r.iuranStatus] ?? r.iuranStatus}
+                    : r.iuranFullyPaid
+                      ? <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">
+                          Lunas
                         </span>
-                      : <span className="text-gray-600 text-[10px]">—</span>
+                      : r.iuranStatus === 'confirmed'
+                        ? <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400">
+                            Cicilan
+                          </span>
+                        : r.iuranStatus
+                          ? <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${STATUS_COLORS[r.iuranStatus] ?? ''}`}>
+                              {STATUS_LABELS[r.iuranStatus] ?? r.iuranStatus}
+                            </span>
+                          : <span className="text-gray-600 text-[10px]">—</span>
                   }
                 </td>
                 <td className="py-2.5 text-right">
