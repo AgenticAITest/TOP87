@@ -699,7 +699,7 @@ export default function AdminPayments() {
         </div>
         <div className="glass rounded-xl p-4 text-center">
           <p className="text-2xl font-bold font-serif text-blue-400">Rp {fundTotals.donation.toLocaleString('id-ID')}</p>
-          <p className="text-xs uppercase tracking-widest text-gray-500 mt-1">Donasi Terkonfirmasi</p>
+          <p className="text-xs uppercase tracking-widest text-gray-500 mt-1">Saldo Donasi</p>
         </div>
         <div className="glass rounded-xl p-4 text-center col-span-2 sm:col-span-1">
           <p className="text-2xl font-bold font-serif text-yellow-400">{pendingCount}</p>
