@@ -8,7 +8,7 @@ import {
   fetchAdminPayments, updatePaymentAdmin,
   fetchApprovedMembers, fetchPaymentSummaryReport,
   fetchPaymentAllocations, savePaymentAllocations,
-  fetchKaosReport,
+  fetchKaosReport, fetchFundTotals,
   qk, type Payment, type MemberPaymentSummary, type LedgerAllocation, type AccountType, type KaosRow,
 } from '../../lib/queries';
 
@@ -176,6 +176,7 @@ function EditDrawer({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'payments'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'payment-summary'] });
+      queryClient.invalidateQueries({ queryKey: qk.fundTotals() });
       queryClient.invalidateQueries({ queryKey: ['dashboard', 'member'] });
       setSaved(true);
       setTimeout(onClose, 800);
@@ -192,6 +193,7 @@ function EditDrawer({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'payments'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'payment-summary'] });
+      queryClient.invalidateQueries({ queryKey: qk.fundTotals() });
       queryClient.invalidateQueries({ queryKey: ['payment-allocations', payment.id] });
       setAllocSaved(true);
       setTimeout(() => setAllocSaved(false), 2000);
@@ -655,6 +657,14 @@ export default function AdminPayments() {
     staleTime: 2 * 60_000,
   });
 
+  // Allocation-aware totals for the stat cards (reclassify model — matches Rekap Anggota).
+  const { data: fundTotals = { reunion_fee: 0, donation: 0 } } = useQuery({
+    queryKey: qk.fundTotals(),
+    queryFn:  fetchFundTotals,
+    enabled:  !adminLoading,
+    staleTime: 60_000,
+  });
+
   const filtered = useMemo(() => {
     let r = payments;
     if (typeTab   !== 'all') r = r.filter(p => p.type   === typeTab);
@@ -666,14 +676,12 @@ export default function AdminPayments() {
     return r;
   }, [payments, typeTab, statusTab, search]);
 
-  const totals = useMemo(() => {
-    const confirmed = payments.filter(p => p.status === 'confirmed');
-    return {
-      reunionFee: confirmed.filter(p => p.type === 'reunion_fee').reduce((s, p) => s + (p.admin_adjusted_amount ?? p.member_amount), 0),
-      donation:   confirmed.filter(p => p.type === 'donation').reduce((s,   p) => s + (p.admin_adjusted_amount ?? p.member_amount), 0),
-      pending:    payments.filter(p => p.status === 'submitted').length,
-    };
-  }, [payments]);
+  // Iuran/donasi totals now come from fundTotals (allocation-aware). Only the pending count
+  // is derived from the raw transaction list here.
+  const pendingCount = useMemo(
+    () => payments.filter(p => p.status === 'submitted').length,
+    [payments],
+  );
 
   return (
     <div className="p-8 min-h-screen">
@@ -686,15 +694,15 @@ export default function AdminPayments() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
         <div className="glass rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold font-serif text-green-400">Rp {totals.reunionFee.toLocaleString('id-ID')}</p>
+          <p className="text-2xl font-bold font-serif text-green-400">Rp {fundTotals.reunion_fee.toLocaleString('id-ID')}</p>
           <p className="text-xs uppercase tracking-widest text-gray-500 mt-1">Iuran Terkonfirmasi</p>
         </div>
         <div className="glass rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold font-serif text-blue-400">Rp {totals.donation.toLocaleString('id-ID')}</p>
+          <p className="text-2xl font-bold font-serif text-blue-400">Rp {fundTotals.donation.toLocaleString('id-ID')}</p>
           <p className="text-xs uppercase tracking-widest text-gray-500 mt-1">Donasi Terkonfirmasi</p>
         </div>
         <div className="glass rounded-xl p-4 text-center col-span-2 sm:col-span-1">
-          <p className="text-2xl font-bold font-serif text-yellow-400">{totals.pending}</p>
+          <p className="text-2xl font-bold font-serif text-yellow-400">{pendingCount}</p>
           <p className="text-xs uppercase tracking-widest text-gray-500 mt-1">Menunggu Konfirmasi</p>
         </div>
       </div>

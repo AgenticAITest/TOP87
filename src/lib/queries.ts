@@ -30,6 +30,7 @@ export const qk = {
   adminOrders:      (isSuperAdmin: boolean, ids: string[]) => ['admin', 'orders', isSuperAdmin, ...ids]      as const,
   // Financial report
   financialReport:  ()                                      => ['admin', 'financial-report']                  as const,
+  fundTotals:       ()                                      => ['admin', 'fund-totals']                       as const,
   // Phase 4 — comments
   comments:         (mediaId: string)                       => ['comments', mediaId]                          as const,
   latestComment:    ()                                      => ['comments', 'latest']                         as const,
@@ -873,7 +874,21 @@ export async function fetchMemberIuranPaid(profileId: string): Promise<boolean> 
   return ledgerSum + unallocatedSum >= target;
 }
 
+// Public fundraising totals for the member dashboard.
+// Prefers the allocation-aware server-side RPC `get_fund_totals` (reclassify model, computed
+// across everyone via SECURITY DEFINER — required because RLS hides other members' payments).
+// Falls back to the type-based, RLS-limited query if that function isn't deployed yet, so the
+// front end is safe to ship before the migration is applied and upgrades automatically after.
 export async function fetchPaymentTotals(): Promise<{ reunion_fee: number; donation: number }> {
+  const { data: rpcData, error: rpcErr } = await supabase.rpc('get_fund_totals');
+  if (!rpcErr && Array.isArray(rpcData) && rpcData.length > 0) {
+    return {
+      reunion_fee: Number((rpcData[0] as any).reunion_fee) || 0,
+      donation:    Number((rpcData[0] as any).donation)    || 0,
+    };
+  }
+
+  // Fallback: type-based (and RLS-limited for non-admins) until the RPC exists.
   const { data } = await supabase
     .from('payments')
     .select('type, member_amount, admin_adjusted_amount')
@@ -885,6 +900,45 @@ export async function fetchPaymentTotals(): Promise<{ reunion_fee: number; donat
     else if (p.type === 'donation') totals.donation += amt;
   });
   return totals;
+}
+
+// Allocation-aware fund totals (the "reclassify" model): money follows where it was allocated,
+// not the payment's original type. Same unified rule as the Rekap — iuran ledger allocations +
+// donation-pool allocations + confirmed payments not yet allocated (counted by type).
+// Requires full ledger read access (super-admin context — e.g. the Pembayaran stat cards).
+export async function fetchFundTotals(): Promise<{ reunion_fee: number; donation: number }> {
+  const [{ data: iuranTxns }, { data: donTxns }, { data: pays }] = await Promise.all([
+    supabase.from('account_transactions')
+      .select('amount, payment_id, member_accounts!inner(account_type, profile_id)')
+      .eq('member_accounts.account_type', 'iuran')
+      .not('member_accounts.profile_id', 'is', null),
+    supabase.from('account_transactions')
+      .select('amount, payment_id, member_accounts!inner(account_type, profile_id), payments!inner(status)')
+      .eq('member_accounts.account_type', 'donation')
+      .is('member_accounts.profile_id', null)
+      .eq('payments.status', 'confirmed'),
+    supabase.from('payments')
+      .select('id, type, member_amount, admin_adjusted_amount')
+      .eq('status', 'confirmed'),
+  ]);
+
+  const allocated = new Set<string>();
+  let reunion_fee = 0, donation = 0;
+  for (const t of iuranTxns ?? []) {
+    reunion_fee += (t.amount as number);
+    if ((t as any).payment_id) allocated.add((t as any).payment_id);
+  }
+  for (const t of donTxns ?? []) {
+    donation += (t.amount as number);
+    if ((t as any).payment_id) allocated.add((t as any).payment_id);
+  }
+  for (const p of pays ?? []) {
+    if (allocated.has((p as any).id)) continue;
+    const amt = ((p as any).admin_adjusted_amount ?? (p as any).member_amount) as number;
+    if (p.type === 'reunion_fee')   reunion_fee += amt;
+    else if (p.type === 'donation') donation    += amt;
+  }
+  return { reunion_fee, donation };
 }
 
 // ─── Finance Admin ────────────────────────────────────────────────────────────
