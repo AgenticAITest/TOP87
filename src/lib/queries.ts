@@ -7,6 +7,7 @@ export const qk = {
   charter:        (slug: string)                          => ['charters', slug]                            as const,
   members:        ()                                      => ['members']                                   as const,
   member:         (id: string)                            => ['members', id]                               as const,
+  memberFull:     (id: string)                            => ['admin', 'member-full', id]                  as const,
   memberships:    (profileId: string)                     => ['memberships', profileId]                    as const,
   media:          (status: string)                        => ['media', status]                             as const,
   adminDashboard: (isSuperAdmin: boolean, ids: string[]) => ['admin', 'dashboard', isSuperAdmin, ...ids]  as const,
@@ -165,6 +166,49 @@ export async function fetchMemberById(id: string) {
       charter_id: cm.charter_id, is_primary: cm.is_primary, charter: cm.charters,
     })),
   };
+}
+
+export interface MemberFullProfile {
+  id: string;
+  name: string | null;
+  nickname: string | null;
+  avatar_url: string | null;
+  status: string;
+  phone: string | null;
+  whatsapp: string | null;
+  city: string | null;
+  profession: string | null;
+  birthdate: string | null;
+  bio: string | null;
+  reunion_attendance: string | null;
+  reunion_no_reason: string | null;
+  funny_event: string | null;
+  message_to_friends: string | null;
+  tshirt_size: string | null;
+  special_needs: string | null;
+  is_super_admin: boolean;
+  created_at: string;
+  charters: { name: string | null; is_primary: boolean }[];
+}
+
+/** Full profile for the admin member-detail view — all fields, any status (super-admin read). */
+export async function fetchMemberFullProfile(id: string): Promise<MemberFullProfile> {
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('id, name, nickname, avatar_url, status, phone, whatsapp, city, profession, birthdate, bio, reunion_attendance, reunion_no_reason, funny_event, message_to_friends, tshirt_size, special_needs, is_super_admin, created_at')
+    .eq('id', id)
+    .single();
+  must(profile, error);
+
+  const { data: cms } = await supabase
+    .from('charter_members')
+    .select('is_primary, charters(name)')
+    .eq('profile_id', id);
+
+  return {
+    ...(profile as any),
+    charters: (cms ?? []).map((cm: any) => ({ name: cm.charters?.name ?? null, is_primary: cm.is_primary })),
+  } as MemberFullProfile;
 }
 
 // ─── Phase 1 — Friends ────────────────────────────────────────────────────────

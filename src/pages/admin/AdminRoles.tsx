@@ -171,6 +171,12 @@ export default function AdminRoles() {
         <p className="text-gray-500 text-sm mt-1">Appoint and manage site administrators.</p>
       </div>
 
+      {(charterMut.error || superMut.error || financeMut.error) && (
+        <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          Gagal memperbarui peran: {((charterMut.error ?? superMut.error ?? financeMut.error) as Error).message}
+        </div>
+      )}
+
       {/* Super Admins */}
       <section className="mb-8">
         <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-gold/60 mb-3">Super Admins</h2>

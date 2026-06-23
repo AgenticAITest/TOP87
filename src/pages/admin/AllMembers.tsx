@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Search, Check, X, ShieldOff, RotateCcw, MapPin, Trash2 } from 'lucide-react';
+import { Search, Check, X, ShieldOff, RotateCcw, MapPin, Trash2, Eye, ShieldCheck } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { fetchCharters, qk } from '../../lib/queries';
+import { fetchCharters, fetchMemberFullProfile, qk } from '../../lib/queries';
 
 async function fetchAllMembersAdmin() {
   const { data, error } = await supabase
@@ -65,6 +65,99 @@ function timeAgo(iso: string) {
 
 const STATUS_TABS: Status[] = ['all', 'pending', 'approved', 'suspended', 'rejected', 'no_rsvp'];
 
+function Field({ label, value }: { label: string; value: string | null | undefined }) {
+  if (!value) return null;
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-widest text-gray-500">{label}</p>
+      <p className="text-sm text-gray-200 mt-0.5 whitespace-pre-wrap break-words">{value}</p>
+    </div>
+  );
+}
+
+function MemberDetailModal({ id, onClose }: { id: string; onClose: () => void }) {
+  const { data, isLoading } = useQuery({
+    queryKey: qk.memberFull(id),
+    queryFn:  () => fetchMemberFullProfile(id),
+  });
+
+  const attendance = data?.reunion_attendance
+    ? (ATTENDANCE_LABELS[data.reunion_attendance] ?? data.reunion_attendance)
+    : null;
+  const charterList = data?.charters?.length
+    ? data.charters.map(c => `${c.name}${c.is_primary ? ' ★' : ''}`).join(', ')
+    : null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+        className="relative z-10 glass rounded-2xl w-full max-w-lg max-h-[88vh] overflow-y-auto p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <h3 className="font-serif text-xl font-bold text-white">Detail Anggota</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all">
+            <X size={16} />
+          </button>
+        </div>
+
+        {isLoading || !data ? (
+          <div className="py-16 text-center text-gray-500 text-sm tracking-widest uppercase animate-pulse">Memuat…</div>
+        ) : (
+          <>
+            {/* Header */}
+            <div className="flex items-center gap-4">
+              {data.avatar_url ? (
+                <img src={data.avatar_url} alt={data.name ?? ''} referrerPolicy="no-referrer"
+                  className="w-16 h-16 rounded-xl object-cover shrink-0" />
+              ) : (
+                <div className="w-16 h-16 rounded-xl bg-gold/10 flex items-center justify-center shrink-0">
+                  <span className="text-2xl font-serif font-bold text-gold">{data.name?.charAt(0) ?? '?'}</span>
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-lg font-bold text-white truncate">{data.name ?? '—'}</p>
+                {data.nickname && <p className="text-xs text-gray-400">"{data.nickname}"</p>}
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${STATUS_COLORS[data.status] ?? 'text-gray-400'}`}>
+                    {data.status}
+                  </span>
+                  {data.is_super_admin && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gold/10 text-gold flex items-center gap-1">
+                      <ShieldCheck size={9} /> Super Admin
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Fields */}
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Kota" value={data.city} />
+              <Field label="Profesi" value={data.profession} />
+              <Field label="Telepon" value={data.phone} />
+              <Field label="WhatsApp" value={data.whatsapp} />
+              <Field label="Tanggal Lahir" value={data.birthdate} />
+              <Field label="Ukuran Kaos" value={data.tshirt_size} />
+              <Field label="Kehadiran Reuni" value={attendance} />
+            </div>
+
+            <Field label="Charter" value={charterList} />
+            <Field label="Alasan Tidak Hadir" value={data.reunion_no_reason} />
+            <Field label="Bio" value={data.bio} />
+            <Field label="Cerita Lucu / Kenangan" value={data.funny_event} />
+            <Field label="Pesan untuk Teman" value={data.message_to_friends} />
+            <Field label="Kebutuhan Khusus" value={data.special_needs} />
+
+            <p className="text-[10px] text-gray-600 pt-2 border-t border-white/5">
+              Bergabung {new Date(data.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
+          </>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
 export default function AllMembers() {
   const { user }       = useAuth();
   const queryClient    = useQueryClient();
@@ -73,6 +166,7 @@ export default function AllMembers() {
   const [charterId, setCharterId] = useState('');
   const [attendance, setAttendance] = useState<AttendanceFilter>('all');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [viewId, setViewId] = useState<string | null>(null);
 
   const { data: members = [], isLoading } = useQuery({
     queryKey: ['admin', 'all-members'],
@@ -288,6 +382,11 @@ export default function AllMembers() {
                   </span>
 
                   <div className="flex gap-1.5 shrink-0">
+                    <button onClick={() => setViewId(member.id)}
+                      title="Lihat detail"
+                      className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:bg-gold/10 hover:text-gold transition-all">
+                      <Eye size={14} />
+                    </button>
                     {member.status === 'pending' && (<>
                       <button onClick={() => actionMutation.mutate({ memberId: member.id, newStatus: 'approved' })}
                         disabled={actionMutation.isPending} title="Approve"
@@ -326,6 +425,8 @@ export default function AllMembers() {
           ))}
         </div>
       )}
+
+      {viewId && <MemberDetailModal id={viewId} onClose={() => setViewId(null)} />}
     </div>
   );
 }
