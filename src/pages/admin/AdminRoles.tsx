@@ -13,7 +13,7 @@ import { fetchCharters, grantFinanceAdmin, revokeFinanceAdmin, qk } from '../../
 async function fetchAdmins() {
   const [{ data: sData }, { data: cData }, { data: fData }] = await Promise.all([
     supabase.from('profiles').select('id, name, avatar_url').eq('is_super_admin', true).order('name'),
-    supabase.from('charter_admins').select('profile_id, charter_id, profiles(id, name, avatar_url), charters(id, name)'),
+    supabase.from('charter_admins').select('profile_id, charter_id, profiles!charter_admins_profile_id_fkey(id, name, avatar_url), charters(id, name)'),
     supabase.from('finance_admins').select('profile_id, profiles(id, name, avatar_url)'),
   ]);
   return {
