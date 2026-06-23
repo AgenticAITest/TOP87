@@ -99,8 +99,10 @@ export default function AdminRoles() {
   const charterMut = useMutation({
     mutationFn: async ({ profileId, charterId, grant }: { profileId: string; charterId: string; grant: boolean }) => {
       if (grant) {
+        // Idempotent: if the member already admins this charter, treat as a no-op (avoid 409).
         const { error } = await supabase.from('charter_admins')
-          .insert({ profile_id: profileId, charter_id: charterId, granted_by: user!.id });
+          .upsert({ profile_id: profileId, charter_id: charterId, granted_by: user!.id },
+                  { onConflict: 'profile_id,charter_id', ignoreDuplicates: true });
         if (error) throw error;
       } else {
         const { error } = await supabase.from('charter_admins')
