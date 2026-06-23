@@ -90,7 +90,19 @@ Admin queries take `(isSuperAdmin, charterIds)` and use `charterScope()` to filt
 - Finance/commerce: `payments`, `payment_credits`, `merchandise`, `merchandise_orders`, `expenses`, `expense_categories`, `keringanan_requests`
 - Ledger: `member_accounts`, `account_transactions`
 
-Migrations are **phased and date-prefixed** (`YYYYMMDD_phaseN_*.sql` or `YYYYMMDD_<feature>.sql`); add new schema as a new migration file rather than editing old ones. Supabase **edge functions** live in `supabase/functions/` (e.g. `delete-member`).
+Migrations are **phased and date-prefixed** (`YYYYMMDD_phaseN_*.sql` or `YYYYMMDD_<feature>.sql`); add new schema as a new migration file rather than editing old ones. They are **applied manually in the Supabase SQL editor** (no CLI auto-apply in this workflow), so a migration file can exist in-repo but not yet be applied — and if a change writes a new column, the migration must be applied **before** the front-end that writes it is deployed. The **base schema** (e.g. `charter_admins`, the core `profiles` columns) lives directly in Supabase and is *not* in `migrations/`. Supabase **edge functions** live in `supabase/functions/` (e.g. `delete-member`).
+
+### Payments, the ledger & the "reclassify" model
+
+The `account_transactions` ledger — per-member `member_accounts` plus a `profile_id IS NULL` donation **pool** — is the source of truth for how confirmed money is split. A super admin **allocates** a payment in the Pembayaran edit drawer ("Alokasi Dana") into iuran (per member) and/or donation rows. **Money follows the allocation, not the payment's `type`** ("reclassify"): a `donation`-type payment allocated to a member's iuran counts as iuran (and credits that member), reducing the remaining donation.
+
+One unified rule is used in `fetchPaymentSummaryReport`, `fetchFundTotals`, `fetchMemberIuranPaid`, and `fetchKaosReport`:
+
+> `paidIuran = iuran ledger allocations + confirmed reunion_fee payments NOT yet allocated`
+
+(allocated payments are already in the ledger; counting them again double-counts — the same exclusion applies to donations). **Lunas** = `paidIuran >= reunion_fee_target`. The fee is the single source `site_settings.reunion_fee_target` via `fetchReunionFeeTarget()` — don't hardcode `1_870_000` (a few legacy literals remain in `QRISModal`/drawer defaults). Member donations are gated in the UI until iuran is lunas.
+
+Totals must stay allocation-aware: Rekap Anggota, the Pembayaran stat cards (`fetchFundTotals`), and the dashboard. **RLS shapes where this can be computed**: members read only their *own* payments + *own* iuran ledger, the *donation pool is globally readable*, and admins read everything. So a global allocation-aware total for members (the dashboard) can't be done client-side — it goes through the `get_fund_totals()` SECURITY DEFINER RPC, which `fetchPaymentTotals` calls (falling back to the type-based query if the RPC isn't deployed).
 
 ### Storage Abstraction
 
@@ -121,3 +133,11 @@ These were once planned and are now live — read the relevant page/query before
 - **Media** — multi-upload (20 photos or 3 videos per batch), comments, tags, charter association, admin moderation queue
 - **CMS** — per-page editable content (`cms_content`) plus site-wide settings
 - **Theme** — light/dark toggle (`ThemeContext`)
+
+## Conventions & gotchas
+
+- **`Register` doubles as the profile edit form** (pre-fills from the existing profile). It must NOT demote members — it preserves an existing `approved`/`suspended` status rather than forcing `pending`. Charter membership is also editable in `MyProfile` (`updateMemberships`), so members rarely need `/register`. A DB trigger (`prevent_member_status_change`) backstops self-status changes: only admins/back-end may change `profiles.status` (members only on first registration or re-apply after rejection).
+- **`charter_admins` has two FKs to `profiles`** (`profile_id` and `granted_by`), so a plain `profiles(...)` embed is ambiguous (PostgREST `PGRST201`). Always disambiguate: `profiles!charter_admins_profile_id_fkey(...)`. Granting needs a super-admin RLS write policy on `charter_admins`, and the insert is idempotent (`upsert … ignoreDuplicates`) to avoid 409s on re-grant.
+- **Admin mutations should surface errors** — several historically failed silently (e.g. role grants). Show the mutation error in the UI.
+- The full `profiles` field set is the `Profile` interface in `AuthContext.tsx` — it has grown well past the basics (e.g. `nickname, birthdate, whatsapp, reunion_attendance, funny_event, message_to_friends, tshirt_size, special_needs, kelas`). `kelas` is the graduation class, constrained to `3A`–`3F`.
+- **Deployment** is a manual static deploy (build `dist/` → serve from a VPS); there is no deploy config in-repo and no CI. Details live in the project memory, not here.
