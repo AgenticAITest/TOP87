@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect, FormEvent, ChangeEvent } from 'react';
 import { motion } from 'motion/react';
 import { ShieldCheck, Save, Camera, Loader, RefreshCw, UserPlus, X, Search, Ruler, HeartHandshake, Sparkles } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { qk, fetchMemberships, fetchApprovedMembers, fetchFriends, saveFriends, fetchMyKeringanan, submitKeringanan, resubmitKeringanan } from '../lib/queries';
+import { qk, fetchMemberships, updateMemberships, fetchCharters, fetchApprovedMembers, fetchFriends, saveFriends, fetchMyKeringanan, submitKeringanan, resubmitKeringanan } from '../lib/queries';
 
 const ATTENDANCE_OPTIONS = [
   { value: 'yes',       label: 'Hadir',             color: 'text-green-700 bg-green-50 border-green-300' },
@@ -36,6 +35,12 @@ export default function MyProfile() {
     queryKey: qk.memberships(user?.id ?? ''),
     queryFn:  () => fetchMemberships(user!.id),
     enabled:  !!user,
+  });
+
+  const { data: allCharters = [] } = useQuery({
+    queryKey: qk.charters(),
+    queryFn:  fetchCharters,
+    staleTime: 5 * 60_000,
   });
 
   const { data: allMembers = [] } = useQuery({
@@ -88,6 +93,30 @@ export default function MyProfile() {
       setFriends(slots);
     }
   }, [savedFriends]);
+
+  // ── Charter membership editing ────────────────────────────────────────────
+  const [primaryCharter, setPrimaryCharter] = useState('');
+  const [extraCharters,  setExtraCharters]  = useState<string[]>([]);
+  const [chartersSaved,  setChartersSaved]  = useState(false);
+  const chartersInitialized = useRef(false);
+
+  useEffect(() => {
+    if (!chartersInitialized.current && memberships.length > 0) {
+      chartersInitialized.current = true;
+      const primary = memberships.find(m => m.is_primary) ?? memberships[0];
+      setPrimaryCharter(primary?.charter_id ?? '');
+      setExtraCharters(memberships.filter(m => m.charter_id !== primary?.charter_id).map(m => m.charter_id));
+    }
+  }, [memberships]);
+
+  function selectPrimaryCharter(id: string) {
+    setPrimaryCharter(id);
+    setExtraCharters(prev => prev.filter(x => x !== id));
+  }
+  function toggleExtraCharter(id: string) {
+    if (id === primaryCharter) return;
+    setExtraCharters(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }
 
   const selectedIds = new Set(friends.filter(Boolean).map(f => f!.id));
   const filteredMembers = friendSearch.length > 1
@@ -218,6 +247,17 @@ export default function MyProfile() {
     },
   });
 
+  // ── Charter memberships save mutation ─────────────────────────────────────
+  const membershipsMutation = useMutation({
+    mutationFn: () => updateMemberships(user!.id, primaryCharter, extraCharters),
+    onSuccess: () => {
+      chartersInitialized.current = false;
+      queryClient.invalidateQueries({ queryKey: qk.memberships(user!.id) });
+      setChartersSaved(true);
+      setTimeout(() => setChartersSaved(false), 3000);
+    },
+  });
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaved(false);
@@ -309,24 +349,57 @@ export default function MyProfile() {
           </p>
         )}
 
-        {/* Charter memberships */}
-        {memberships.length > 0 && (
-          <div className="glass-card p-5 rounded-xl mb-6 shadow-sm">
-            <p className="text-xs uppercase tracking-widest text-gray-400 mb-4">Charter Membership</p>
-            <div className="flex flex-wrap gap-3">
-              {memberships.map(m => (
-                <Link key={m.charter_id} to={`/charters/${m.charter.slug}`}
-                  className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-colors ${
-                    m.is_primary
-                      ? 'bg-amber-50 text-gold border border-gold/30 hover:bg-amber-100'
-                      : 'bg-white text-gray-600 border border-amber-200 hover:border-amber-300 hover:text-forest'
-                  }`}>
-                  {m.charter.name}{m.is_primary ? ' ★' : ''}
-                </Link>
-              ))}
-            </div>
+        {/* Charter memberships — editable (so members never need the registration form to change charter) */}
+        <div className="glass-card p-5 rounded-xl mb-6 shadow-sm">
+          <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Charter Membership</p>
+          <p className="text-[11px] text-gray-500 mb-4">Pilih charter utama dan charter tambahan kamu. Mengubah ini tidak mengubah status keanggotaan.</p>
+
+          {/* Primary charter */}
+          <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-2">Charter Utama *</p>
+          <div className="flex flex-wrap gap-2 mb-4">
+            {allCharters.map(c => (
+              <button key={c.id} type="button" onClick={() => selectPrimaryCharter(c.id)}
+                className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest border transition-colors ${
+                  primaryCharter === c.id
+                    ? 'bg-amber-50 text-gold border-gold/30'
+                    : 'bg-white text-gray-600 border-amber-200 hover:border-amber-300'
+                }`}>
+                {c.name}{primaryCharter === c.id ? ' ★' : ''}
+              </button>
+            ))}
           </div>
-        )}
+
+          {/* Extra charters */}
+          {allCharters.filter(c => c.id !== primaryCharter).length > 0 && (
+            <>
+              <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-2">Charter Tambahan (opsional)</p>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {allCharters.filter(c => c.id !== primaryCharter).map(c => (
+                  <button key={c.id} type="button" onClick={() => toggleExtraCharter(c.id)}
+                    className={`px-4 py-2 rounded-full text-xs font-medium border transition-colors ${
+                      extraCharters.includes(c.id)
+                        ? 'bg-gold/15 text-gold border-gold/40'
+                        : 'bg-white text-gray-500 border-amber-200 hover:border-amber-300'
+                    }`}>
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {membershipsMutation.isError && (
+            <p className="text-red-400 text-sm mb-2">{(membershipsMutation.error as Error).message}</p>
+          )}
+          {chartersSaved && <p className="text-green-600 text-sm font-medium mb-2">Charter diperbarui.</p>}
+
+          <button type="button" onClick={() => membershipsMutation.mutate()}
+            disabled={membershipsMutation.isPending || !primaryCharter}
+            className="flex items-center gap-2 btn-primary font-bold py-2.5 px-6 rounded-xl transition-all disabled:opacity-50 uppercase tracking-widest text-xs">
+            {membershipsMutation.isPending ? <Loader size={14} className="animate-spin" /> : <Save size={14} />}
+            {membershipsMutation.isPending ? 'Menyimpan…' : 'Simpan Charter'}
+          </button>
+        </div>
 
         {/* Edit form */}
         <form key={formKey} onSubmit={handleSubmit} className="space-y-5"

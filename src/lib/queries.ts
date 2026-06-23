@@ -236,6 +236,45 @@ export async function fetchMemberships(profileId: string) {
   }));
 }
 
+/** Replace a member's charter memberships (primary + extras). Never touches profile status. */
+export async function updateMemberships(
+  profileId: string,
+  primaryCharterId: string,
+  extraCharterIds: string[],
+): Promise<void> {
+  if (!primaryCharterId) throw new Error('Pilih charter utama terlebih dahulu.');
+  const extras   = extraCharterIds.filter(id => id !== primaryCharterId);
+  const selected = [primaryCharterId, ...extras];
+
+  // Remove memberships no longer selected
+  const { data: existing, error: exErr } = await supabase
+    .from('charter_members')
+    .select('charter_id')
+    .eq('profile_id', profileId);
+  if (exErr) throw exErr;
+  const toDelete = (existing ?? [])
+    .map((r: any) => r.charter_id as string)
+    .filter(id => !selected.includes(id));
+  if (toDelete.length > 0) {
+    const { error: delErr } = await supabase
+      .from('charter_members')
+      .delete()
+      .eq('profile_id', profileId)
+      .in('charter_id', toDelete);
+    if (delErr) throw delErr;
+  }
+
+  // Upsert selected set with correct primary flag
+  const rows = [
+    { profile_id: profileId, charter_id: primaryCharterId, is_primary: true },
+    ...extras.map(id => ({ profile_id: profileId, charter_id: id, is_primary: false })),
+  ];
+  const { error: upErr } = await supabase
+    .from('charter_members')
+    .upsert(rows, { onConflict: 'profile_id,charter_id' });
+  if (upErr) throw upErr;
+}
+
 export async function fetchApprovedMedia() {
   const { data, error } = await supabase
     .from('media')

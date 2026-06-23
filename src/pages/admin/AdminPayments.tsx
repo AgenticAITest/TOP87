@@ -72,6 +72,7 @@ function EditDrawer({
   const [memberSearch, setMemberSearch] = useState('');
   const [searchTarget, setSearchTarget] = useState<string | null>(null); // key of row being searched
   const [allocSaved,   setAllocSaved]   = useState(false);
+  const [mismatchAck,  setMismatchAck]  = useState(false); // confirm allocating against payment type
 
   const { data: allMembers = [] } = useQuery({
     queryKey: qk.members(),
@@ -120,6 +121,17 @@ function EditDrawer({
   const totalAmount    = parseRp(adjAmt) || payment.member_amount;
   const allocatedTotal = rows.reduce((s, r) => s + (parseInt(r.amount, 10) || 0), 0);
   const remaining      = totalAmount - allocatedTotal;
+
+  // Guard against allocating money against the payment's stated type.
+  const donationToIuran = payment.type === 'donation'
+    && rows.some(r => r.accountType === 'iuran' && (parseInt(r.amount, 10) || 0) > 0);
+  const feeNoIuran = payment.type === 'reunion_fee'
+    && rows.length > 0
+    && !rows.some(r => r.accountType === 'iuran' && (parseInt(r.amount, 10) || 0) > 0);
+  const typeMismatch = donationToIuran || feeNoIuran;
+  const mismatchMsg  = donationToIuran
+    ? 'Pembayaran ini bertipe Donasi tapi dialokasikan ke Iuran anggota.'
+    : 'Pembayaran ini bertipe Iuran tapi tidak ada alokasi ke Iuran (semua ke Donasi).';
 
   function addIuranRow() {
     const key = String(Date.now());
@@ -359,6 +371,20 @@ function EditDrawer({
               </p>
             )}
 
+            {typeMismatch && (
+              <label className="flex items-start gap-2 rounded-lg bg-yellow-500/5 border border-yellow-500/30 p-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={mismatchAck}
+                  onChange={e => setMismatchAck(e.target.checked)}
+                  className="mt-0.5 accent-yellow-400"
+                />
+                <span className="text-[11px] text-yellow-300/90 leading-snug">
+                  ⚠️ {mismatchMsg} Centang untuk melanjutkan.
+                </span>
+              </label>
+            )}
+
             {allocMutation.isError && (
               <p className="text-red-400 text-xs">{(allocMutation.error as Error).message}</p>
             )}
@@ -366,7 +392,7 @@ function EditDrawer({
             <button
               type="button"
               onClick={() => allocMutation.mutate()}
-              disabled={allocMutation.isPending || remaining !== 0}
+              disabled={allocMutation.isPending || remaining !== 0 || (typeMismatch && !mismatchAck)}
               className="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-gold/10 border border-white/10 hover:border-gold/30 text-gray-300 hover:text-gold font-bold py-2 rounded-full transition-all disabled:opacity-40 uppercase tracking-widest text-xs"
             >
               {allocMutation.isPending

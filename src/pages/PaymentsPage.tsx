@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
-import { CreditCard, CheckCircle, Clock, XCircle, Receipt, ExternalLink } from 'lucide-react';
+import { CreditCard, CheckCircle, Clock, XCircle, Receipt, ExternalLink, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchMyPayments, fetchMemberIuranPaid, qk, type Payment } from '../lib/queries';
 import QRISModal from '../components/QRISModal';
@@ -51,6 +51,8 @@ export default function PaymentsPage() {
 
   const pendingCount = filtered.filter(p => p.status === 'submitted' || p.status === 'pending_review').length;
   const tabLabel = tab === 'reunion_fee' ? 'Iuran Reuni' : 'Donasi';
+  // Donations open only after iuran is fully paid — keeps iuran/donasi accounting clean.
+  const donationLocked = tab === 'donation' && !iuranPaid;
 
   return (
     <div className="p-6 md:p-8 max-w-2xl">
@@ -106,6 +108,14 @@ export default function PaymentsPage() {
               <CheckCircle size={14} />
               Iuran Lunas
             </span>
+          ) : donationLocked ? (
+            <span
+              title="Selesaikan iuran reuni untuk membuka donasi"
+              className="flex items-center gap-2 py-2.5 px-5 rounded-full font-bold uppercase tracking-widest text-xs whitespace-nowrap shrink-0 bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed select-none"
+            >
+              <Lock size={14} />
+              Lunasi Iuran Dulu
+            </span>
           ) : (
             <button
               onClick={() => setShowModal(true)}
@@ -116,6 +126,11 @@ export default function PaymentsPage() {
             </button>
           )}
         </div>
+        {donationLocked && (
+          <p className="mt-3 text-xs text-gray-500 border-t border-gray-100 pt-3">
+            Donasi terbuka setelah iuran reuni kamu lunas. Selesaikan iuran terlebih dahulu di tab <span className="font-semibold text-gray-700">Iuran Reuni</span>.
+          </p>
+        )}
       </div>
 
       {/* Payment history */}
@@ -126,6 +141,8 @@ export default function PaymentsPage() {
           <CreditCard size={32} className="mx-auto mb-3 opacity-30" />
           {tab === 'reunion_fee' && iuranPaid ? (
             <p className="text-gray-600">Iuran dibayarkan oleh member lain.</p>
+          ) : donationLocked ? (
+            <p className="text-gray-600">Donasi terbuka setelah iuran reuni kamu lunas.</p>
           ) : (
             <>
               <p className="text-gray-600">Belum ada riwayat {tabLabel.toLowerCase()}.</p>

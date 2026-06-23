@@ -67,7 +67,11 @@ export default function Register() {
           reunion_attendance: form.reunion_attendance || null,
           reunion_no_reason:  form.reunion_attendance === 'no' ? form.reunion_no_reason || null : null,
           tshirt_size:        form.tshirt_size || null,
-          status:             'pending',
+          // Preserve an existing approved/suspended status — editing the form must not
+          // silently demote a member back to pending. Only first-time/pending/rejected → pending.
+          status:             (profile?.status === 'approved' || profile?.status === 'suspended')
+                                ? profile.status
+                                : 'pending',
           updated_at:         new Date().toISOString(),
         }, { onConflict: 'id' });
       if (profileErr) throw profileErr;
@@ -83,7 +87,8 @@ export default function Register() {
 
       await refreshProfile();
     },
-    onSuccess: () => navigate('/pending'),
+    // Approved members editing their info go back to their profile, not the pending screen.
+    onSuccess: () => navigate(profile?.status === 'approved' ? '/profile' : '/pending'),
   });
 
   function toggleExtra(id: string) {
