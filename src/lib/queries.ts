@@ -186,6 +186,7 @@ export interface MemberFullProfile {
   message_to_friends: string | null;
   tshirt_size: string | null;
   special_needs: string | null;
+  kelas: string | null;
   is_super_admin: boolean;
   created_at: string;
   charters: { name: string | null; is_primary: boolean }[];
@@ -195,7 +196,7 @@ export interface MemberFullProfile {
 export async function fetchMemberFullProfile(id: string): Promise<MemberFullProfile> {
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('id, name, nickname, avatar_url, status, phone, whatsapp, city, profession, birthdate, bio, reunion_attendance, reunion_no_reason, funny_event, message_to_friends, tshirt_size, special_needs, is_super_admin, created_at')
+    .select('id, name, nickname, avatar_url, status, phone, whatsapp, city, profession, birthdate, bio, reunion_attendance, reunion_no_reason, funny_event, message_to_friends, tshirt_size, special_needs, kelas, is_super_admin, created_at')
     .eq('id', id)
     .single();
   must(profile, error);

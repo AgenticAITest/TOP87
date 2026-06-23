@@ -13,6 +13,7 @@ const ATTENDANCE_OPTIONS = [
 ] as const;
 
 const TSHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'] as const;
+const KELAS_OPTIONS = ['3A', '3B', '3C', '3D', '3E', '3F'] as const;
 
 function toTitleCase(str: string): string {
   return str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
@@ -72,6 +73,7 @@ export default function MyProfile() {
     message_to_friends: profile?.message_to_friends ?? '',
     tshirt_size:        profile?.tshirt_size ?? '',
     special_needs:      profile?.special_needs ?? '',
+    kelas:              profile?.kelas ?? '',
   });
   const [saved, setSaved] = useState(false);
   const formKey = profile?.id ?? 'none';
@@ -165,6 +167,7 @@ export default function MyProfile() {
         message_to_friends: f.message_to_friends || null,
         tshirt_size:        f.tshirt_size || null,
         special_needs:      f.special_needs || null,
+        kelas:              f.kelas || null,
         updated_at:         new Date().toISOString(),
       }).eq('id', user!.id);
       if (error) throw error;
@@ -418,6 +421,7 @@ export default function MyProfile() {
             message_to_friends: profile.message_to_friends ?? '',
             tshirt_size:        profile.tshirt_size ?? '',
             special_needs:      profile.special_needs ?? '',
+            kelas:              profile.kelas ?? '',
           }); }}>
 
           {/* ── Full Name + Nickname ── */}
@@ -472,13 +476,24 @@ export default function MyProfile() {
             </div>
           </div>
 
-          {/* ── Phone ── */}
-          <div>
-            <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">No. Telepon Lain</label>
-            <input value={form.phone}
-              onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-              className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
-              placeholder="Opsional jika beda dari WA" />
+          {/* ── Phone + Kelas ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">No. Telepon Lain</label>
+              <input value={form.phone}
+                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
+                placeholder="Opsional jika beda dari WA" />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Kelas</label>
+              <select value={form.kelas}
+                onChange={e => setForm(f => ({ ...f, kelas: e.target.value }))}
+                className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors">
+                <option value="">Pilih kelas…</option>
+                {KELAS_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </div>
           </div>
 
           {/* ── Bio ── */}

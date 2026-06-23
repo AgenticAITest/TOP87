@@ -142,6 +142,7 @@ function MemberDetailModal({ id, onClose }: { id: string; onClose: () => void })
             </div>
 
             <Field label="Charter" value={charterList} />
+            <Field label="Kelas" value={data.kelas} />
             <Field label="Alasan Tidak Hadir" value={data.reunion_no_reason} />
             <Field label="Bio" value={data.bio} />
             <Field label="Cerita Lucu / Kenangan" value={data.funny_event} />

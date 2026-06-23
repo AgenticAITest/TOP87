@@ -22,6 +22,7 @@ export interface Profile {
   message_to_friends: string | null;
   tshirt_size: string | null;
   special_needs: string | null;
+  kelas: string | null;
 }
 
 interface AuthContextType {

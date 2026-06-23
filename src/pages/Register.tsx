@@ -14,6 +14,7 @@ const ATTENDANCE_OPTIONS = [
 ] as const;
 
 const TSHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'] as const;
+const KELAS_OPTIONS = ['3A', '3B', '3C', '3D', '3E', '3F'] as const;
 
 function toTitleCase(str: string): string {
   return str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
@@ -39,6 +40,7 @@ export default function Register() {
     reunion_attendance: (profile?.reunion_attendance ?? '') as string,
     reunion_no_reason:  profile?.reunion_no_reason ?? '',
     tshirt_size:        profile?.tshirt_size ?? '',
+    kelas:              profile?.kelas ?? '',
   });
 
   const { data: charters = [] } = useQuery({
@@ -67,6 +69,7 @@ export default function Register() {
           reunion_attendance: form.reunion_attendance || null,
           reunion_no_reason:  form.reunion_attendance === 'no' ? form.reunion_no_reason || null : null,
           tshirt_size:        form.tshirt_size || null,
+          kelas:              form.kelas || null,
           // Preserve an existing approved/suspended status — editing the form must not
           // silently demote a member back to pending. Only first-time/pending/rejected → pending.
           status:             (profile?.status === 'approved' || profile?.status === 'suspended')
@@ -166,13 +169,24 @@ export default function Register() {
             </div>
           </div>
 
-          {/* ── Phone (legacy) ── */}
-          <div>
-            <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">No. Telepon Lain</label>
-            <input value={form.phone}
-              onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-              className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
-              placeholder="Opsional jika beda dari WA" />
+          {/* ── Phone + Kelas ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">No. Telepon Lain</label>
+              <input value={form.phone}
+                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors"
+                placeholder="Opsional jika beda dari WA" />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Kelas</label>
+              <select value={form.kelas}
+                onChange={e => setForm(f => ({ ...f, kelas: e.target.value }))}
+                className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:border-gold/50 transition-colors">
+                <option value="">Pilih kelas…</option>
+                {KELAS_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </div>
           </div>
 
           {/* ── Bio ── */}
