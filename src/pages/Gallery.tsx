@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { qk, fetchApprovedMedia, fetchCharters } from '../lib/queries';
 import { resolveMediaUrl } from '../lib/storage';
 import MediaComments from '../components/MediaComments';
+import MediaTags from '../components/MediaTags';
 
 type MediaItem = Awaited<ReturnType<typeof fetchApprovedMedia>>[number];
 
@@ -335,20 +336,13 @@ export default function Gallery() {
                       </div>
                     )}
 
-                    {/* Tags */}
-                    {lightbox.tags.length > 0 && (
-                      <div className="flex gap-1.5 flex-wrap justify-center mb-4">
-                        {lightbox.tags.map(t => (
-                          <button
-                            key={t}
-                            onClick={() => { setTag(t); setLightboxIdx(null); }}
-                            className="text-[10px] bg-white/10 hover:bg-gold/20 text-white/70 hover:text-gold rounded-full px-2.5 py-0.5 transition-colors"
-                          >
-                            #{t}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {/* Tags (uploader + member-added) */}
+                    <MediaTags
+                      mediaId={lightbox.id}
+                      uploaderTags={lightbox.tags}
+                      onTagClick={t => { setTag(t); setLightboxIdx(null); }}
+                      variant="dark"
+                    />
 
                     <div className="border-t border-white/10 pt-4">
                       <MediaComments mediaId={lightbox.id} variant="dark" />
