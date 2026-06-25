@@ -1,0 +1,27 @@
+services:
+  web:
+    build:
+      context: .
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    restart: always
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      # apex + www both routed here; www is redirected to apex below
+      - "traefik.http.routers.top87.rule=Host(`top87.id`) || Host(`www.top87.id`)"
+      - "traefik.http.routers.top87.entrypoints=websecure"
+      - "traefik.http.routers.top87.tls.certresolver=letsencrypt"
+      - "traefik.http.services.top87.loadbalancer.server.port=80"
+      - "traefik.http.routers.top87.middlewares=top87-www-redirect"
+      - "traefik.http.middlewares.top87-www-redirect.redirectregex.regex=^https://www\\.top87\\.id/(.*)"
+      - "traefik.http.middlewares.top87-www-redirect.redirectregex.replacement=https://top87.id/$${1}"
+      - "traefik.http.middlewares.top87-www-redirect.redirectregex.permanent=true"
+
+networks:
+  proxy:
+    external: true
+    # Must match the shared Traefik network name on the VPS.
+    name: proxy
