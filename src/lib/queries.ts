@@ -459,6 +459,12 @@ export interface PaymentCredit {
   profile?:    { name: string; avatar_url: string | null } | null;
 }
 
+// A payment counts as settled money once it is confirmed. `bank_reconciled` is the *most*
+// settled stage (confirmed AND matched against the bank statement), so it must count the same
+// as `confirmed` in every total/lunas calculation — otherwise reconciling money makes it vanish.
+export const COUNTED_PAYMENT_STATUSES = ['confirmed', 'bank_reconciled'] as const;
+const isCountedStatus = (s: string): boolean => s === 'confirmed' || s === 'bank_reconciled';
+
 export interface Payment {
   id:                    string;
   profile_id:            string;
@@ -674,7 +680,7 @@ export async function fetchPaymentSummaryReport(
     .select('amount, payment_id, member_accounts!inner(profile_id, account_type), payments!inner(profile_id, status)')
     .eq('member_accounts.account_type', 'donation')
     .is('member_accounts.profile_id', null)
-    .eq('payments.status', 'confirmed');
+    .in('payments.status', COUNTED_PAYMENT_STATUSES);
 
   // Build iuran ledger map: profile_id → { amount, payer_name | null }
   // payer_name is non-null when someone else paid for this member
@@ -724,7 +730,7 @@ export async function fetchPaymentSummaryReport(
     // would double-count; an explicit split that sends little to iuran correctly stays partial.
     const ledgerIuran = ledger?.amount ?? 0;
     const unallocatedConfirmed = iuranList
-      .filter((p: any) => p.status === 'confirmed' && !allocatedPaymentIds.has(p.id))
+      .filter((p: any) => isCountedStatus(p.status) && !allocatedPaymentIds.has(p.id))
       .reduce((sum: number, p: any) => sum + (p.admin_adjusted_amount ?? p.member_amount), 0);
     const paidConfirmed = ledgerIuran + unallocatedConfirmed;
 
@@ -743,7 +749,7 @@ export async function fetchPaymentSummaryReport(
       iuranStatus = 'confirmed';
       iuranAmount = paidConfirmed;
       // Credited when the iuran came from the ledger but the member has no confirmed payment of their own.
-      const hasOwnConfirmed = iuranList.some((p: any) => p.status === 'confirmed');
+      const hasOwnConfirmed = iuranList.some((p: any) => isCountedStatus(p.status));
       if (ledger && !hasOwnConfirmed) {
         iuranCreditedBy = ledger.payerName;
         iuranStatus     = 'credited';
@@ -760,7 +766,7 @@ export async function fetchPaymentSummaryReport(
     // + confirmed donation-type payments NOT already allocated to the pool (avoids double-count).
     const ledgerDonation = donByProfile.get(m.id) ?? 0;
     const standaloneDonation = all
-      .filter((p: any) => p.type === 'donation' && p.status === 'confirmed' && !allocatedPaymentIds.has(p.id))
+      .filter((p: any) => p.type === 'donation' && isCountedStatus(p.status) && !allocatedPaymentIds.has(p.id))
       .reduce((sum: number, p: any) => sum + (p.admin_adjusted_amount ?? p.member_amount), 0);
     const donationTotal = ledgerDonation + standaloneDonation;
 
@@ -895,7 +901,7 @@ export async function fetchMemberIuranPaid(profileId: string): Promise<boolean> 
       .select('id, member_amount, admin_adjusted_amount')
       .eq('profile_id', profileId)
       .eq('type', 'reunion_fee')
-      .eq('status', 'confirmed'),
+      .in('status', COUNTED_PAYMENT_STATUSES),
   ]);
   if (ledgerRes.error) throw ledgerRes.error;
   if (payRes.error)    throw payRes.error;
@@ -937,7 +943,7 @@ export async function fetchPaymentTotals(): Promise<{ reunion_fee: number; donat
   const { data } = await supabase
     .from('payments')
     .select('type, member_amount, admin_adjusted_amount')
-    .eq('status', 'confirmed');
+    .in('status', COUNTED_PAYMENT_STATUSES);
   const totals = { reunion_fee: 0, donation: 0 };
   (data ?? []).forEach((p: any) => {
     const amt = (p.admin_adjusted_amount ?? p.member_amount) as number;
@@ -961,10 +967,10 @@ export async function fetchFundTotals(): Promise<{ reunion_fee: number; donation
       .select('amount, payment_id, member_accounts!inner(account_type, profile_id), payments!inner(status)')
       .eq('member_accounts.account_type', 'donation')
       .is('member_accounts.profile_id', null)
-      .eq('payments.status', 'confirmed'),
+      .in('payments.status', COUNTED_PAYMENT_STATUSES),
     supabase.from('payments')
       .select('id, type, member_amount, admin_adjusted_amount')
-      .eq('status', 'confirmed'),
+      .in('status', COUNTED_PAYMENT_STATUSES),
   ]);
 
   const allocated = new Set<string>();
@@ -1882,7 +1888,7 @@ export async function fetchKaosReport(
   // Confirmed reunion_fee payments (raw)
   let pq = supabase.from('payments')
     .select('id, profile_id, member_amount, admin_adjusted_amount')
-    .eq('type', 'reunion_fee').eq('status', 'confirmed');
+    .eq('type', 'reunion_fee').in('status', COUNTED_PAYMENT_STATUSES);
   if (profileIds) pq = pq.in('profile_id', profileIds);
   const { data: paidData } = await pq;
 

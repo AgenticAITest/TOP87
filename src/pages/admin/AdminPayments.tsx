@@ -20,6 +20,7 @@ const STATUS_COLORS: Record<string, string> = {
   submitted:      'bg-blue-500/10 text-blue-400',
   pending_review: 'bg-yellow-500/10 text-yellow-400',
   confirmed:      'bg-green-500/10 text-green-400',
+  bank_reconciled:'bg-emerald-500/10 text-emerald-400',
   rejected:       'bg-red-500/10 text-red-400',
 };
 
@@ -27,6 +28,7 @@ const STATUS_LABELS: Record<string, string> = {
   submitted:      'Dikirim',
   pending_review: 'Diproses',
   confirmed:      'Dikonfirmasi',
+  bank_reconciled:'Bank Rekon',
   rejected:       'Ditolak',
 };
 
@@ -122,6 +124,10 @@ function EditDrawer({
   const allocatedTotal = rows.reduce((s, r) => s + (parseInt(r.amount, 10) || 0), 0);
   const remaining      = totalAmount - allocatedTotal;
 
+  // Confirmed (and bank_reconciled) payments are FINAL: the drawer is read-only and the
+  // ledger/status are frozen. Correcting a mistake requires a direct DB edit, by design.
+  const isLocked = payment.status === 'confirmed' || payment.status === 'bank_reconciled';
+
   // Guard against allocating money against the payment's stated type.
   const donationToIuran = payment.type === 'donation'
     && rows.some(r => r.accountType === 'iuran' && (parseInt(r.amount, 10) || 0) > 0);
@@ -132,6 +138,12 @@ function EditDrawer({
   const mismatchMsg  = donationToIuran
     ? 'Pembayaran ini bertipe Donasi tapi dialokasikan ke Iuran anggota.'
     : 'Pembayaran ini bertipe Iuran tapi tidak ada alokasi ke Iuran (semua ke Donasi).';
+
+  // A payment may only be confirmed once its money is fully allocated: nothing left over,
+  // every iuran row assigned to a member, and any type-mismatch explicitly acknowledged.
+  const allIuranAssigned       = rows.every(r => r.accountType !== 'iuran' || !!r.profileId);
+  const allocationComplete     = remaining === 0 && allIuranAssigned && (!typeMismatch || mismatchAck);
+  const confirmNeedsAllocation = status === 'confirmed' && !isLocked && !allocationComplete;
 
   function addIuranRow() {
     const key = String(Date.now());
@@ -167,17 +179,28 @@ function EditDrawer({
   function formatRpLocal(n: number) { return 'Rp ' + n.toLocaleString('id-ID'); }
 
   const mutation = useMutation({
-    mutationFn: () => updatePaymentAdmin(payment.id, {
-      admin_adjusted_amount: parseRp(adjAmt) !== payment.member_amount ? parseRp(adjAmt) : null,
-      status,
-      admin_notes: adminNotes.trim() || null,
-      reviewed_by: reviewerId,
-    }),
+    // When confirming, the allocation is committed atomically with the status change so a
+    // confirmed payment is always fully posted to the ledger (Option B: allocation-first).
+    mutationFn: async () => {
+      if (status === 'confirmed') {
+        const allocations: LedgerAllocation[] = rows
+          .filter(r => parseInt(r.amount, 10) > 0 && (r.accountType !== 'iuran' || r.profileId))
+          .map(r => ({ profileId: r.profileId, accountType: r.accountType, amount: parseInt(r.amount, 10) }));
+        await savePaymentAllocations(payment.id, allocations, reviewerId);
+      }
+      await updatePaymentAdmin(payment.id, {
+        admin_adjusted_amount: parseRp(adjAmt) !== payment.member_amount ? parseRp(adjAmt) : null,
+        status,
+        admin_notes: adminNotes.trim() || null,
+        reviewed_by: reviewerId,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'payments'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'payment-summary'] });
       queryClient.invalidateQueries({ queryKey: qk.fundTotals() });
       queryClient.invalidateQueries({ queryKey: ['dashboard', 'member'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-allocations', payment.id] });
       setSaved(true);
       setTimeout(onClose, 800);
     },
@@ -229,32 +252,41 @@ function EditDrawer({
             type="text"
             value={parseRp(adjAmt) > 0 ? 'Rp ' + parseRp(adjAmt).toLocaleString('id-ID') : ''}
             onChange={e => setAdjAmt(e.target.value.replace(/\D/g, ''))}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-gold/50"
+            disabled={isLocked}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-gold/50 disabled:opacity-60"
           />
-          <button
-            type="button"
-            onClick={() => setAdjAmt(String(payment.member_amount))}
-            className="mt-1 text-[10px] text-gold/60 hover:text-gold transition-colors"
-          >
-            Reset ke {formatRpLocal(payment.member_amount)}
-          </button>
+          {!isLocked && (
+            <button
+              type="button"
+              onClick={() => setAdjAmt(String(payment.member_amount))}
+              className="mt-1 text-[10px] text-gold/60 hover:text-gold transition-colors"
+            >
+              Reset ke {formatRpLocal(payment.member_amount)}
+            </button>
+          )}
         </div>
 
         <div>
           <label className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">Status</label>
-          <div className="relative">
-            <select
-              value={status}
-              onChange={e => setStatus(e.target.value as Payment['status'])}
-              className="w-full appearance-none bg-zinc-800 border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-gold/50 pr-8"
-            >
-              <option value="submitted"      className="bg-zinc-800 text-white">Dikirim</option>
-              <option value="pending_review" className="bg-zinc-800 text-white">Diproses</option>
-              <option value="confirmed"      className="bg-zinc-800 text-white">Dikonfirmasi</option>
-              <option value="rejected"       className="bg-zinc-800 text-white">Ditolak</option>
-            </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
-          </div>
+          {isLocked ? (
+            <div className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-emerald-400 font-medium">
+              {STATUS_LABELS[payment.status] ?? payment.status} · final
+            </div>
+          ) : (
+            <div className="relative">
+              <select
+                value={status}
+                onChange={e => setStatus(e.target.value as Payment['status'])}
+                className="w-full appearance-none bg-zinc-800 border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-gold/50 pr-8"
+              >
+                <option value="submitted"      className="bg-zinc-800 text-white">Dikirim</option>
+                <option value="pending_review" className="bg-zinc-800 text-white">Diproses</option>
+                <option value="confirmed"      className="bg-zinc-800 text-white">Dikonfirmasi</option>
+                <option value="rejected"       className="bg-zinc-800 text-white">Ditolak</option>
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+            </div>
+          )}
         </div>
 
         <div>
@@ -263,7 +295,8 @@ function EditDrawer({
             value={adminNotes}
             onChange={e => setAdminNotes(e.target.value)}
             rows={2}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-gold/50 resize-none"
+            disabled={isLocked}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-gold/50 resize-none disabled:opacity-60"
           />
         </div>
 
@@ -271,17 +304,31 @@ function EditDrawer({
           <p className="text-red-400 text-xs">{(mutation.error as Error).message}</p>
         )}
 
-        <button
-          onClick={() => mutation.mutate()}
-          disabled={mutation.isPending}
-          className="w-full flex items-center justify-center gap-2 bg-gold hover:bg-gold/90 text-charcoal font-bold py-2.5 rounded-full transition-all disabled:opacity-50 uppercase tracking-widest text-xs"
-        >
-          {mutation.isPending
-            ? <><Loader size={13} className="animate-spin" /> Menyimpan…</>
-            : saved
-              ? <><Check size={13} /> Tersimpan</>
-              : 'Simpan'}
-        </button>
+        {isLocked ? (
+          <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-3 text-[11px] text-emerald-300/90 leading-snug">
+            🔒 Pembayaran sudah dikonfirmasi dan terkunci. Alokasi & status bersifat final dan tidak
+            dapat diubah.
+          </div>
+        ) : (
+          <>
+            {confirmNeedsAllocation && (
+              <p className="text-yellow-400 text-[11px]">
+                Alokasikan seluruh dana ke iuran anggota / donasi sebelum mengonfirmasi.
+              </p>
+            )}
+            <button
+              onClick={() => mutation.mutate()}
+              disabled={mutation.isPending || confirmNeedsAllocation}
+              className="w-full flex items-center justify-center gap-2 bg-gold hover:bg-gold/90 text-charcoal font-bold py-2.5 rounded-full transition-all disabled:opacity-50 uppercase tracking-widest text-xs"
+            >
+              {mutation.isPending
+                ? <><Loader size={13} className="animate-spin" /> Menyimpan…</>
+                : saved
+                  ? <><Check size={13} /> Tersimpan</>
+                  : status === 'confirmed' ? 'Konfirmasi & Simpan Alokasi' : 'Simpan'}
+            </button>
+          </>
+        )}
 
         {/* ── Allocation section (super admin only) ── */}
         {isSuperAdmin && (
@@ -315,14 +362,17 @@ function EditDrawer({
                       inputMode="numeric"
                       value={row.amount ? 'Rp ' + parseInt(row.amount || '0', 10).toLocaleString('id-ID') : ''}
                       onChange={e => updateAmount(row.key, e.target.value)}
-                      className="w-28 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs text-right focus:outline-none focus:border-gold/50"
+                      disabled={isLocked}
+                      className="w-28 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs text-right focus:outline-none focus:border-gold/50 disabled:opacity-60"
                     />
-                    <button type="button" onClick={() => removeRow(row.key)} className="text-gray-600 hover:text-red-400 transition-colors shrink-0">
-                      <X size={12} />
-                    </button>
+                    {!isLocked && (
+                      <button type="button" onClick={() => removeRow(row.key)} className="text-gray-600 hover:text-red-400 transition-colors shrink-0">
+                        <X size={12} />
+                      </button>
+                    )}
                   </div>
                   {/* Member search for iuran rows without a profile yet */}
-                  {row.accountType === 'iuran' && !row.profileId && (
+                  {!isLocked && row.accountType === 'iuran' && !row.profileId && (
                     <div className="relative ml-14">
                       <Search size={10} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
                       <input
@@ -356,16 +406,18 @@ function EditDrawer({
             </div>
 
             {/* Add row buttons */}
-            <div className="flex gap-2">
-              <button type="button" onClick={addIuranRow}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wider font-bold text-green-400 bg-green-500/5 border border-green-500/20 hover:bg-green-500/10 transition-all">
-                <Plus size={10} /> Iuran Anggota
-              </button>
-              <button type="button" onClick={addDonationRow}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wider font-bold text-blue-400 bg-blue-500/5 border border-blue-500/20 hover:bg-blue-500/10 transition-all">
-                <Plus size={10} /> Donasi
-              </button>
-            </div>
+            {!isLocked && (
+              <div className="flex gap-2">
+                <button type="button" onClick={addIuranRow}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wider font-bold text-green-400 bg-green-500/5 border border-green-500/20 hover:bg-green-500/10 transition-all">
+                  <Plus size={10} /> Iuran Anggota
+                </button>
+                <button type="button" onClick={addDonationRow}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wider font-bold text-blue-400 bg-blue-500/5 border border-blue-500/20 hover:bg-blue-500/10 transition-all">
+                  <Plus size={10} /> Donasi
+                </button>
+              </div>
+            )}
 
             {remaining !== 0 && (
               <p className={`text-[10px] ${remaining < 0 ? 'text-red-400' : 'text-yellow-400'}`}>
@@ -391,18 +443,20 @@ function EditDrawer({
               <p className="text-red-400 text-xs">{(allocMutation.error as Error).message}</p>
             )}
 
-            <button
-              type="button"
-              onClick={() => allocMutation.mutate()}
-              disabled={allocMutation.isPending || remaining !== 0 || (typeMismatch && !mismatchAck)}
-              className="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-gold/10 border border-white/10 hover:border-gold/30 text-gray-300 hover:text-gold font-bold py-2 rounded-full transition-all disabled:opacity-40 uppercase tracking-widest text-xs"
-            >
-              {allocMutation.isPending
-                ? <><Loader size={12} className="animate-spin" /> Menyimpan…</>
-                : allocSaved
-                  ? <><Check size={12} /> Alokasi Tersimpan</>
-                  : <><UserCheck size={12} /> Simpan Alokasi</>}
-            </button>
+            {!isLocked && (
+              <button
+                type="button"
+                onClick={() => allocMutation.mutate()}
+                disabled={allocMutation.isPending || remaining !== 0 || (typeMismatch && !mismatchAck)}
+                className="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-gold/10 border border-white/10 hover:border-gold/30 text-gray-300 hover:text-gold font-bold py-2 rounded-full transition-all disabled:opacity-40 uppercase tracking-widest text-xs"
+              >
+                {allocMutation.isPending
+                  ? <><Loader size={12} className="animate-spin" /> Menyimpan…</>
+                  : allocSaved
+                    ? <><Check size={12} /> Alokasi Tersimpan</>
+                    : <><UserCheck size={12} /> Simpan Alokasi</>}
+              </button>
+            )}
           </div>
         )}
       </motion.div>

@@ -30,7 +30,8 @@ AS $$
     FROM account_transactions at
     JOIN member_accounts ma ON ma.id = at.account_id
     JOIN payments p ON p.id = at.payment_id
-    WHERE ma.account_type = 'donation' AND ma.profile_id IS NULL AND p.status = 'confirmed'
+    WHERE ma.account_type = 'donation' AND ma.profile_id IS NULL
+      AND p.status IN ('confirmed', 'bank_reconciled')
   ),
   allocated AS (
     SELECT payment_id FROM iuran_alloc WHERE payment_id IS NOT NULL
@@ -40,7 +41,7 @@ AS $$
   unallocated AS (
     SELECT p.type, COALESCE(p.admin_adjusted_amount, p.member_amount) AS amt
     FROM payments p
-    WHERE p.status = 'confirmed'
+    WHERE p.status IN ('confirmed', 'bank_reconciled')
       AND p.id NOT IN (SELECT payment_id FROM allocated)
   )
   SELECT
