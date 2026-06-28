@@ -1,11 +1,11 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { qk, fetchCharters } from '../lib/queries';
+import { qk, fetchCharters, fetchMemberships } from '../lib/queries';
 
 const ATTENDANCE_OPTIONS = [
   { value: 'yes',       label: 'Hadir',              color: 'text-green-700 bg-green-50 border-green-300' },
@@ -48,6 +48,25 @@ export default function Register() {
     queryFn:  fetchCharters,
     staleTime: 1000 * 60 * 5,
   });
+
+  // Pre-load existing charter memberships so a returning member (e.g. an approved
+  // member bounced here for an empty city) doesn't have to re-pick — and isn't
+  // blocked by the "select your primary charter" guard on submit.
+  const { data: memberships = [] } = useQuery({
+    queryKey: qk.memberships(user?.id ?? ''),
+    queryFn:  () => fetchMemberships(user!.id),
+    enabled:  !!user,
+  });
+
+  const chartersInitialized = useRef(false);
+  useEffect(() => {
+    if (!chartersInitialized.current && memberships.length > 0) {
+      chartersInitialized.current = true;
+      const primary = memberships.find(m => m.is_primary) ?? memberships[0];
+      setPrimary(primary?.charter_id ?? '');
+      setExtras(memberships.filter(m => m.charter_id !== primary?.charter_id).map(m => m.charter_id));
+    }
+  }, [memberships]);
 
   const submitMutation = useMutation({
     mutationFn: async () => {
@@ -262,38 +281,43 @@ export default function Register() {
           {/* ── Charter Membership ── */}
           <div>
             <label className="block text-xs uppercase tracking-widest text-gray-500 mb-3">Charter Membership *</label>
-            <p className="text-xs text-gray-600 mb-4">Select your primary charter. You may also join secondary charters.</p>
+            <p className="text-xs text-gray-600 mb-4">Tap <strong>Set as Primary</strong> on your main charter. Use <strong>Also join</strong> to add secondary charters.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {charters.map(charter => {
                 const isPrimary = primaryCharter === charter.id;
                 const isExtra   = extraCharters.includes(charter.id);
                 return (
                   <div key={charter.id}
-                    className={`glass-card rounded-xl p-4 cursor-pointer transition-all border ${
+                    className={`glass-card rounded-xl p-4 transition-all border ${
                       isPrimary ? 'border-gold/50 bg-amber-50/80' :
                       isExtra   ? 'border-amber-300 bg-amber-50/50' :
-                      'border-amber-100 hover:border-amber-300'
-                    }`}
-                    onClick={() => {
-                      if (isPrimary) return;
-                      setPrimary(charter.id);
-                      setExtras(prev => prev.filter(x => x !== charter.id));
-                    }}>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-forest">{charter.name}</p>
-                        <p className="text-xs text-gray-500">{charter.city}, {charter.country}</p>
-                      </div>
+                      'border-amber-100'
+                    }`}>
+                    <div className="mb-3">
+                      <p className="text-sm font-semibold text-forest">{charter.name}</p>
+                      <p className="text-xs text-gray-500">{charter.city}, {charter.country}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
                       {isPrimary ? (
-                        <span className="text-[10px] uppercase tracking-widest text-gold bg-gold/10 px-2 py-0.5 rounded-full">Primary</span>
+                        <span className="text-[10px] uppercase tracking-widest text-gold bg-gold/10 px-2.5 py-1 rounded-full font-semibold">★ Primary</span>
                       ) : (
-                        <button type="button"
-                          onClick={e => { e.stopPropagation(); toggleExtra(charter.id); }}
-                          className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full transition-colors ${
-                            isExtra ? 'text-white bg-white/10' : 'text-gray-600 hover:text-white'
-                          }`}>
-                          {isExtra ? '✓ Added' : '+ Also join'}
-                        </button>
+                        <>
+                          <button type="button"
+                            onClick={() => {
+                              setPrimary(charter.id);
+                              setExtras(prev => prev.filter(x => x !== charter.id));
+                            }}
+                            className="text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full border border-gold/40 text-gold hover:bg-gold/10 transition-colors">
+                            Set as Primary
+                          </button>
+                          <button type="button"
+                            onClick={() => toggleExtra(charter.id)}
+                            className={`text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full transition-colors ${
+                              isExtra ? 'text-white bg-white/10' : 'text-gray-600 border border-gray-300 hover:text-forest'
+                            }`}>
+                            {isExtra ? '✓ Added' : '+ Also join'}
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>

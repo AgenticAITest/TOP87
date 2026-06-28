@@ -28,8 +28,11 @@ export default function ProtectedRoute({ children, requireApproved = false }: Pr
   // Show loading instead of redirecting — avoids false /pending redirects
   if (!profile) return <Loading />;
 
-  // Signed in, profile loaded — check registration completeness
-  if (!profile.city) return <Navigate to="/register" replace />;
+  // Signed in, profile loaded — check registration completeness.
+  // Only force the registration form for members who haven't been approved yet;
+  // an approved member with a blank city fixes their details on /profile instead
+  // of being bounced into the "Submit for Approval" flow.
+  if (!profile.city && profile.status !== 'approved') return <Navigate to="/register" replace />;
 
   // Approved-only routes
   if (requireApproved && profile.status !== 'approved') {
