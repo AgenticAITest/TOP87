@@ -248,7 +248,7 @@ export default function PublicLanding() {
       <section className="py-20 px-6 parchment-bg">
         <div className="max-w-2xl mx-auto text-center">
           <p className="text-[10px] uppercase tracking-[0.4em] text-gold/70 mb-2">Waktu Menuju</p>
-          <h2 className="font-serif text-3xl font-bold text-forest mb-12 uppercase tracking-wider">
+          <h2 className="font-serif text-3xl font-bold text-forest dark:text-gold mb-12 uppercase tracking-wider">
             Kebersamaan
           </h2>
 
