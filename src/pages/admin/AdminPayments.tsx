@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
 import {
-  fetchAdminPayments, updatePaymentAdmin,
+  fetchAdminPayments, updatePaymentAdmin, adminCreatePayment,
   fetchApprovedMembers, fetchPaymentSummaryReport,
   fetchPaymentAllocations, savePaymentAllocations,
   fetchKaosReport, fetchFundTotals,
@@ -464,6 +464,177 @@ function EditDrawer({
   );
 }
 
+// ─── Create Payment Modal (super admin) ───────────────────────────────────────
+// Records an offline payment for a member. On success, hands the new (pending_review)
+// payment to the edit drawer so the admin allocates & confirms via the normal path.
+
+function CreatePaymentModal({
+  actorId,
+  onClose,
+  onCreated,
+}: {
+  actorId:   string;
+  onClose:   () => void;
+  onCreated: (p: Payment) => void;
+}) {
+  const [member,   setMember]   = useState<{ id: string; name: string | null; avatar_url: string | null } | null>(null);
+  const [search,   setSearch]   = useState('');
+  const [type,     setType]     = useState<'reunion_fee' | 'donation'>('reunion_fee');
+  const [amount,   setAmount]   = useState('');
+  const [note,     setNote]     = useState('');
+
+  const { data: allMembers = [] } = useQuery({
+    queryKey: qk.members(),
+    queryFn:  fetchApprovedMembers,
+    staleTime: 5 * 60_000,
+  });
+
+  const suggestions = !member && search.length > 1
+    ? allMembers.filter(m => (m.name ?? '').toLowerCase().includes(search.toLowerCase())).slice(0, 6)
+    : [];
+
+  const amt = parseRp(amount);
+
+  const mutation = useMutation({
+    mutationFn: () => adminCreatePayment({
+      profileId:      member!.id,
+      type,
+      amount:         amt,
+      donationAmount: 0,
+      note:           note.trim() || null,
+      actorId,
+    }),
+    onSuccess: (p) => {
+      // Attach the selected member's profile so the edit drawer can render name/avatar.
+      onCreated({ ...p, profile: { name: member!.name ?? '', avatar_url: member!.avatar_url ?? null } });
+    },
+  });
+
+  const canSubmit = !!member && amt > 0 && !mutation.isPending;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0,  opacity: 1 }}
+        className="relative z-10 glass rounded-2xl w-full max-w-sm p-6 space-y-4 max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="font-serif text-lg font-bold text-white">Tambah Pembayaran</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all">
+            <X size={16} />
+          </button>
+        </div>
+        <p className="text-[11px] text-gray-500 leading-snug -mt-1">
+          Catat pembayaran tunai / transfer manual atas nama anggota. Setelah dibuat, alokasikan &
+          konfirmasi lewat drawer.
+        </p>
+
+        {/* Member picker */}
+        <div>
+          <label className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">Anggota</label>
+          {member ? (
+            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+              <span className="text-sm text-white flex-1 truncate">{member.name ?? member.id}</span>
+              <button type="button" onClick={() => { setMember(null); setSearch(''); }}
+                className="text-gray-500 hover:text-red-400 transition-colors">
+                <X size={13} />
+              </button>
+            </div>
+          ) : (
+            <div className="relative">
+              <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Cari anggota…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-3 py-2 text-white text-sm focus:outline-none focus:border-gold/50"
+              />
+              {suggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-white/10 rounded-xl overflow-hidden z-20">
+                  {suggestions.map(m => (
+                    <button
+                      type="button"
+                      key={m.id}
+                      onClick={() => { setMember({ id: m.id, name: m.name, avatar_url: m.avatar_url }); setSearch(''); }}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-white/5 transition-colors"
+                    >
+                      <span className="text-gray-300">{m.name}</span>
+                      <span className="text-gray-600 ml-auto text-[9px]">{m.primaryCharter?.name ?? ''}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Type */}
+        <div>
+          <label className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">Jenis</label>
+          <div className="flex gap-2">
+            {([['reunion_fee', 'Iuran'], ['donation', 'Donasi']] as const).map(([val, lbl]) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setType(val)}
+                className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+                  type === val
+                    ? 'bg-gold/15 text-gold border border-gold/30'
+                    : 'text-gray-500 border border-white/10 hover:text-white hover:border-white/20'
+                }`}
+              >
+                {lbl}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Amount */}
+        <div>
+          <label className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">Jumlah</label>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={amt > 0 ? 'Rp ' + amt.toLocaleString('id-ID') : ''}
+            onChange={e => setAmount(e.target.value.replace(/\D/g, ''))}
+            placeholder="Rp 0"
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-gold/50"
+          />
+        </div>
+
+        {/* Note */}
+        <div>
+          <label className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">Catatan (opsional)</label>
+          <textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            rows={2}
+            placeholder="mis. Transfer tunai 15 Jul"
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-gold/50 resize-none"
+          />
+        </div>
+
+        {mutation.isError && (
+          <p className="text-red-400 text-xs">{(mutation.error as Error).message}</p>
+        )}
+
+        <button
+          onClick={() => mutation.mutate()}
+          disabled={!canSubmit}
+          className="w-full flex items-center justify-center gap-2 bg-gold hover:bg-gold/90 text-charcoal font-bold py-2.5 rounded-full transition-all disabled:opacity-50 uppercase tracking-widest text-xs"
+        >
+          {mutation.isPending
+            ? <><Loader size={13} className="animate-spin" /> Menyimpan…</>
+            : <><Plus size={13} /> Buat & Alokasikan</>}
+        </button>
+      </motion.div>
+    </div>
+  );
+}
+
 // ─── Rekap Table ──────────────────────────────────────────────────────────────
 
 function RekapTable({ rows, isLoading }: { rows: MemberPaymentSummary[]; isLoading: boolean }) {
@@ -690,6 +861,8 @@ export default function AdminPayments() {
   const [typeTab,   setTypeTab]   = useState<TypeFilter>('all');
   const [statusTab, setStatusTab] = useState<StatusFilter>('all');
   const [editing,   setEditing]   = useState<Payment | null>(null);
+  const [creating,  setCreating]  = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: payments = [], isLoading } = useQuery({
     queryKey: qk.adminPayments(isSuperAdmin, charterIds),
@@ -847,6 +1020,15 @@ export default function AdminPayments() {
                 </button>
               ))}
             </div>
+
+            {isSuperAdmin && (
+              <button
+                onClick={() => setCreating(true)}
+                className="sm:ml-auto flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider bg-gold/15 text-gold border border-gold/30 hover:bg-gold/25 transition-all shrink-0"
+              >
+                <Plus size={13} /> Tambah Pembayaran
+              </button>
+            )}
           </div>
 
           <div className="text-right text-xs text-gray-600 mb-4">{filtered.length} transaksi</div>
@@ -935,6 +1117,18 @@ export default function AdminPayments() {
           reviewerId={user.id}
           isSuperAdmin={isSuperAdmin}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {creating && user && (
+        <CreatePaymentModal
+          actorId={user.id}
+          onClose={() => setCreating(false)}
+          onCreated={(p) => {
+            queryClient.invalidateQueries({ queryKey: ['admin', 'payments'] });
+            setCreating(false);
+            setEditing(p); // hand off to the drawer to allocate & confirm
+          }}
         />
       )}
     </div>

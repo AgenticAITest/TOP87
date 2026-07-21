@@ -118,7 +118,7 @@ const PAGE_KEYS = Object.keys(PAGES);
 // ─── Anggaran config type & defaults ──────────────────────────────────────────
 
 interface AnggaranItem { keterangan: string; amount: number; }
-interface AnggaranConfig { mode: 'per_person' | 'per_category'; quota: number; items: AnggaranItem[]; fee_per_orang?: number; }
+interface AnggaranConfig { mode: 'per_person' | 'per_category'; quota: number; attendance_target?: number; items: AnggaranItem[]; fee_per_orang?: number; }
 
 const DEFAULT_ANGGARAN_CONFIG: AnggaranConfig = {
   mode: 'per_person',
@@ -152,6 +152,7 @@ function AnggaranEditor({ initialJson, onSaved }: { initialJson: string; onSaved
 
   const [mode,        setMode]        = useState<'per_person' | 'per_category'>(initial.mode ?? 'per_person');
   const [quota,       setQuota]       = useState<number>(initial.quota ?? 122);
+  const [attendanceTarget, setAttendanceTarget] = useState<number>(initial.attendance_target ?? initial.quota ?? 122);
   const [feePerOrang, setFeePerOrang] = useState<number>(initial.fee_per_orang ?? 0);
   const [items, setItems] = useState<AnggaranItem[]>(
     initial.items?.length ? initial.items : DEFAULT_ANGGARAN_CONFIG.items
@@ -162,16 +163,25 @@ function AnggaranEditor({ initialJson, onSaved }: { initialJson: string; onSaved
   useEffect(() => {
     setMode(initial.mode ?? 'per_person');
     setQuota(initial.quota ?? 122);
+    setAttendanceTarget(initial.attendance_target ?? initial.quota ?? 122);
     setFeePerOrang(initial.fee_per_orang ?? 0);
     setItems(initial.items?.length ? initial.items : DEFAULT_ANGGARAN_CONFIG.items);
   }, [initial]);
 
   const initialNorm = useMemo(() => {
-    try { return JSON.stringify(JSON.parse(initialJson)); }
-    catch { return JSON.stringify(DEFAULT_ANGGARAN_CONFIG); }
+    let cfg: AnggaranConfig;
+    try { cfg = JSON.parse(initialJson) as AnggaranConfig; }
+    catch { cfg = DEFAULT_ANGGARAN_CONFIG; }
+    return JSON.stringify({
+      mode: cfg.mode ?? 'per_person',
+      quota: cfg.quota ?? 122,
+      attendance_target: cfg.attendance_target ?? cfg.quota ?? 122,
+      items: cfg.items?.length ? cfg.items : DEFAULT_ANGGARAN_CONFIG.items,
+      fee_per_orang: cfg.fee_per_orang || undefined,
+    });
   }, [initialJson]);
 
-  const isDirty = JSON.stringify({ mode, quota, items, fee_per_orang: feePerOrang || undefined }) !== initialNorm;
+  const isDirty = JSON.stringify({ mode, quota, attendance_target: attendanceTarget, items, fee_per_orang: feePerOrang || undefined }) !== initialNorm;
 
   const sumAmount      = items.reduce((s, i) => s + (i.amount || 0), 0);
   const grandTotal     = mode === 'per_person' ? sumAmount * quota : sumAmount;
@@ -179,7 +189,7 @@ function AnggaranEditor({ initialJson, onSaved }: { initialJson: string; onSaved
 
   const { mutate, isPending, isError, error } = useMutation({
     mutationFn: () => upsertField('anggaran', 'items', 'config',
-      JSON.stringify({ mode, quota, items, ...(feePerOrang ? { fee_per_orang: feePerOrang } : {}) }), 'json'),
+      JSON.stringify({ mode, quota, attendance_target: attendanceTarget, items, ...(feePerOrang ? { fee_per_orang: feePerOrang } : {}) }), 'json'),
     onSuccess: () => { setSaved(true); onSaved(); setTimeout(() => setSaved(false), 2000); },
   });
 
@@ -218,14 +228,26 @@ function AnggaranEditor({ initialJson, onSaved }: { initialJson: string; onSaved
         </div>
       </div>
 
-      {/* Quota */}
+      {/* Quota (budget basis / minimum) */}
       <div>
-        <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1.5">Target kehadiran (kuota alumni)</label>
+        <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1.5">Kuota anggaran / minimum</label>
         <input type="number" value={quota} min={1}
           onChange={e => setQuota(parseInt(e.target.value, 10) || 0)}
           className="w-32 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors" />
         <p className="text-[11px] text-gray-600 mt-1">
-          Digunakan untuk progress bar kehadiran dan kalkulasi total biaya (mode per orang).
+          Basis kalkulasi total biaya (mode per orang) dan kuota minimum operasional.
+        </p>
+      </div>
+
+      {/* Attendance target (progress-bar goal) */}
+      <div>
+        <label className="block text-xs uppercase tracking-widest text-gray-500 mb-1.5">Target kehadiran (progress bar)</label>
+        <input type="number" value={attendanceTarget} min={1}
+          onChange={e => setAttendanceTarget(parseInt(e.target.value, 10) || 0)}
+          className="w-32 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold/50 transition-colors" />
+        <p className="text-[11px] text-gray-600 mt-1">
+          Angka yang ingin dicapai untuk progress bar kehadiran (mis. 150). Boleh lebih besar dari
+          kuota minimum — tidak memengaruhi anggaran.
         </p>
       </div>
 

@@ -50,8 +50,9 @@ const FEATURES = [
 
 export default function PublicLanding() {
   const { user, loading, signInWithGoogle } = useAuth();
-  const { data: cms }       = usePageContent('landing');
-  const { data: dashboard } = useDashboardData();
+  const { data: cms }         = usePageContent('landing');
+  const { data: anggaranCms } = usePageContent('anggaran');
+  const { data: dashboard }   = useDashboardData();
 
   if (!loading && user) return <Navigate to="/home" replace />;
 
@@ -60,7 +61,15 @@ export default function PublicLanding() {
   const reunionIso      = cms?.['reunion.date_iso']        ?? DEFAULT_REUNION_ISO;
   const venue           = cms?.['reunion.venue']           ?? 'Bandung / Ciwidey';
   const heroDate        = cms?.['hero.date']               ?? '29 – 30 April 2027';
-  const quotaTarget     = parseInt(cms?.['kpi.quota']      ?? String(DEFAULT_QUOTA), 10);
+  // Attendance goal — shared with the member landing via the anggaran config's attendance_target,
+  // falling back to the legacy landing kpi.quota field, then the default.
+  let anggaranAttendanceTarget: number | undefined;
+  try {
+    if (anggaranCms?.['items.config']) {
+      anggaranAttendanceTarget = (JSON.parse(anggaranCms['items.config']) as { attendance_target?: number }).attendance_target;
+    }
+  } catch { /* use fallback */ }
+  const quotaTarget     = anggaranAttendanceTarget ?? parseInt(cms?.['kpi.quota'] ?? String(DEFAULT_QUOTA), 10);
   const photo1Url     = cms?.['nostalgia.photo1_url']     ?? '';
   const photo1Caption = cms?.['nostalgia.photo1_caption'] ?? 'Koridor, 1986';
   const photo2Url     = cms?.['nostalgia.photo2_url']     ?? '';

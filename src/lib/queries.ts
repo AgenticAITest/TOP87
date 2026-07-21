@@ -572,6 +572,41 @@ export async function submitPayment(input: {
   if (error) throw error;
 }
 
+// Super admin records an OFFLINE payment (cash / manual transfer) on behalf of a member. Lands as
+// 'pending_review'; the admin then allocates & confirms it via the normal edit drawer (allocation-first).
+// Requires the payments_admin_insert RLS policy (migration 20260720_admin_insert_payments.sql).
+export async function adminCreatePayment(input: {
+  profileId:      string;
+  type:           'reunion_fee' | 'donation';
+  amount:         number;
+  donationAmount: number;
+  note:           string | null;
+  actorId:        string;
+}): Promise<Payment> {
+  const { data, error } = await supabase.from('payments').insert({
+    profile_id:      input.profileId,
+    type:            input.type,
+    member_amount:   input.amount,
+    donation_amount: input.donationAmount,
+    receipt_url:     null,
+    member_notes:    input.note,
+    admin_notes:     'Dicatat manual oleh admin',
+    status:          'pending_review',
+  }).select('*').single();
+  if (error) throw error;
+
+  // Audit log — non-blocking (payment already created above)
+  const { error: auditErr } = await supabase.from('audit_log').insert({
+    action:    'payment_created_by_admin',
+    actor_id:  input.actorId,
+    target_id: (data as any).id,
+    details:   { profile_id: input.profileId, type: input.type, amount: input.amount },
+  });
+  if (auditErr) console.error('[audit_log] insert failed:', auditErr.message, auditErr.details);
+
+  return data as Payment;
+}
+
 export async function assignPaymentCredits(
   paymentId:  string,
   profileIds: string[],

@@ -22,6 +22,7 @@ const DEFAULT_BUDGET_NOTE =
 interface AnggaranConfig {
   mode: 'per_person' | 'per_category';
   quota: number;
+  attendance_target?: number;
   items: { keterangan: string; amount: number }[];
   fee_per_orang?: number;
 }
@@ -101,7 +102,8 @@ export default function Landing() {
 
   const anggaranMode  = anggaranConfig.mode  ?? 'per_person';
   const anggaranItems = anggaranConfig.items ?? DEFAULT_ANGGARAN_CONFIG.items;
-  const quotaTarget   = anggaranConfig.quota ?? DEFAULT_ANGGARAN_CONFIG.quota;
+  const quotaTarget   = anggaranConfig.quota ?? DEFAULT_ANGGARAN_CONFIG.quota;       // budget basis + operational minimum
+  const attendanceTarget = anggaranConfig.attendance_target ?? quotaTarget;          // progress-bar goal (may exceed minimum)
 
   const sumAmount           = anggaranItems.reduce((s, i) => s + (i.amount || 0), 0);
   const budgetTargetFromTable = anggaranMode === 'per_person' ? sumAmount * quotaTarget : sumAmount;
@@ -111,7 +113,8 @@ export default function Landing() {
   const countdown        = useCountdown(reunionIso);
   const approvedCount    = dashboard?.approvedCount ?? 0;
   const confirmedCount   = dashboard?.attendance.yes ?? 0;
-  const attendancePct    = quotaTarget > 0 ? Math.min(Math.round((confirmedCount / quotaTarget) * 100), 100) : 0;
+  const attendancePct    = attendanceTarget > 0 ? Math.min(Math.round((confirmedCount / attendanceTarget) * 100), 100) : 0;
+  const minimumMet       = confirmedCount >= quotaTarget;
   const isApproved       = profile?.status === 'approved';
 
   // Keringanan (financial assistance) modal
@@ -230,7 +233,7 @@ export default function Landing() {
             <div className="flex items-baseline">
               <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">{confirmedCount}</span>
               <span className="text-gray-500 dark:text-gray-400 text-lg mx-1">/</span>
-              <span className="text-xl text-gray-500 dark:text-gray-400">{quotaTarget}</span>
+              <span className="text-xl text-gray-500 dark:text-gray-400">{attendanceTarget}</span>
               <span className="ml-2 text-sm text-gray-400 dark:text-gray-500">Alumni</span>
             </div>
             <span className="text-2xl font-bold text-green-600 dark:text-green-400">{attendancePct}%</span>
@@ -242,9 +245,9 @@ export default function Landing() {
             />
           </div>
           <p className="text-[11px] text-gray-600 dark:text-gray-400 mb-3">
-            {attendancePct >= 60
-              ? 'Minimum kuota operasional tercapai ✓'
-              : `Butuh ${Math.max(0, quotaTarget - confirmedCount)} lagi untuk kuota minimum`}
+            {minimumMet
+              ? `Kuota minimum ${quotaTarget} tercapai ✓ — menuju target ${attendanceTarget}`
+              : `Butuh ${quotaTarget - confirmedCount} lagi untuk kuota minimum (${quotaTarget})`}
           </p>
 
           {/* Attendance intent breakdown */}
