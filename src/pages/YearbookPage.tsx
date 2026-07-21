@@ -9,6 +9,15 @@ function getEmbedUrl(url: string): string {
   if (yt) return `https://www.youtube.com/embed/${yt[1]}`;
   const vimeo = url.match(/vimeo\.com\/(\d+)/);
   if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`;
+  // Google Drive file → embeddable /preview. A raw /view (or /edit) share link shows an
+  // "You need access" wall when loaded inside an iframe, even when shared "anyone with link".
+  const drive = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/)
+             ?? url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/)
+             ?? url.match(/drive\.google\.com\/uc\?(?:export=\w+&)?id=([a-zA-Z0-9_-]+)/);
+  if (drive) return `https://drive.google.com/file/d/${drive[1]}/preview`;
+  // Google Docs / Slides / Sheets → /preview
+  const gdoc = url.match(/docs\.google\.com\/(document|presentation|spreadsheets)\/d\/([a-zA-Z0-9_-]+)/);
+  if (gdoc) return `https://docs.google.com/${gdoc[1]}/d/${gdoc[2]}/preview`;
   return url;
 }
 
@@ -72,7 +81,7 @@ export default function YearbookPage() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
             className="rounded-xl overflow-hidden shadow-lg border border-amber-200">
             <iframe
-              src={entry.url}
+              src={getEmbedUrl(entry.url)}
               className="w-full"
               style={{ height: '80vh' }}
               title={`${year} Yearbook`}

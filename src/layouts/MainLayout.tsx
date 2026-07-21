@@ -3,7 +3,7 @@ import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Receipt, ShoppingBag, Heart, Megaphone, HelpCircle,
   Users, Image as ImageIcon, MapPin, BookOpen, Bell, LogOut, Menu, X,
-  ShieldCheck, Info, CircleHelp, Sun, Moon, ChevronLeft, ChevronRight,
+  ShieldCheck, Info, CircleHelp, Sun, Moon, ChevronLeft, ChevronRight, Flame,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminStatus } from '../hooks/useAdminStatus';
@@ -25,6 +25,7 @@ const communityNav = [
   { to: '/charters',      label: 'Charters',     icon: MapPin     },
   { to: '/yearbook/2026', label: 'Yearbook',     icon: BookOpen   },
   { to: '/about',         label: 'Tentang Kami', icon: Info       },
+  { to: '/mengenang',     label: 'In Memoriam',  icon: Flame      },
 ];
 
 function NavItem({

@@ -103,15 +103,6 @@ export default function Navbar() {
             </AnimatePresence>
           </div>
 
-          {user && (
-            <NavLink to="/mengenang"
-              className={({ isActive }) =>
-                `text-sm font-medium uppercase tracking-widest transition-colors ${isActive ? 'text-gold' : 'text-gray-300 hover:text-gold'}`
-              }>
-              In Memoriam
-            </NavLink>
-          )}
-
           {/* Auth area */}
           {loading ? (
             <div className="w-24 h-8 rounded-full bg-white/5 animate-pulse" />
@@ -211,16 +202,6 @@ export default function Navbar() {
               )}
             </AnimatePresence>
           </div>
-
-          {user && (
-            <NavLink to="/mengenang"
-              className={({ isActive }) =>
-                `text-lg font-medium transition-colors ${isActive ? 'text-gold' : 'text-gray-300 hover:text-gold'}`
-              }
-              onClick={() => setIsOpen(false)}>
-              In Memoriam
-            </NavLink>
-          )}
 
           {!user ? (
             <button onClick={() => { signInWithGoogle(); setIsOpen(false); }}

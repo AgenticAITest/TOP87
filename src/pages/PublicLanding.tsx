@@ -249,7 +249,7 @@ export default function PublicLanding() {
         <div className="max-w-2xl mx-auto text-center">
           <p className="text-[10px] uppercase tracking-[0.4em] text-gold/70 mb-2">Waktu Menuju</p>
           <h2 className="font-serif text-3xl font-bold text-forest mb-12 uppercase tracking-wider">
-            Kepulangan
+            Kebersamaan
           </h2>
 
           <div className="grid grid-cols-4 gap-4 sm:gap-8 mb-10">
