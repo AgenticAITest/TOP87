@@ -64,6 +64,8 @@ export const qk = {
   // Alumni roster (master rollcall ↔ account matching)
   roster:            ()                                    => ['admin', 'roster']                                  as const,
   rosterCandidates:  ()                                    => ['admin', 'roster', 'candidates']                    as const,
+  // In Memoriam (deceased alumni, safe read via RPC)
+  memorials:         ()                                    => ['memorials']                                        as const,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -2038,4 +2040,31 @@ export async function unlinkRosterProfile(rosterId: string, actorId: string): Pr
     action: 'roster_unlinked', actor_id: actorId, target_id: rosterId, details: {},
   });
   if (auditErr) console.error('[audit_log] insert failed:', auditErr.message, auditErr.details);
+}
+
+// Mark / unmark a roster entry as deceased (drives the In Memoriam list). Super-admin only (RLS).
+export async function updateRosterRip(rosterId: string, rip: boolean, actorId: string): Promise<void> {
+  const { error } = await supabase.from('alumni_roster').update({ rip }).eq('id', rosterId);
+  if (error) throw error;
+
+  const { error: auditErr } = await supabase.from('audit_log').insert({
+    action: rip ? 'roster_marked_deceased' : 'roster_unmarked_deceased',
+    actor_id: actorId, target_id: rosterId, details: {},
+  });
+  if (auditErr) console.error('[audit_log] insert failed:', auditErr.message, auditErr.details);
+}
+
+// ─── In Memoriam ──────────────────────────────────────────────────────────────
+
+export interface Memorial {
+  kelas:        string;
+  nama_lengkap: string;
+  nama_update:  string | null;
+}
+
+// Deceased alumni, via the list_memorials() SECURITY DEFINER RPC (safe columns only).
+export async function fetchMemorials(): Promise<Memorial[]> {
+  const { data, error } = await supabase.rpc('list_memorials');
+  if (error) throw error;
+  return (data ?? []) as Memorial[];
 }

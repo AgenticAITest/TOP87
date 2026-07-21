@@ -46,6 +46,7 @@ import AdminExpenses         from './pages/admin/AdminExpenses';
 import PaymentsPage     from './pages/PaymentsPage';
 import MerchandisePage  from './pages/MerchandisePage';
 import MyOrdersPage     from './pages/MyOrdersPage';
+import Memoriam        from './pages/Memoriam';
 
 function RootRoute() {
   const { user, loading } = useAuth();
@@ -84,6 +85,7 @@ export default function App() {
           <Route path="/pengumuman"  element={<PengumumanPage />} />
           <Route path="/register"    element={<Register />} />
           <Route path="/pending"     element={<Pending />} />
+          <Route path="/mengenang"   element={<ProtectedRoute><Memoriam /></ProtectedRoute>} />
 
           {/* Approved-member-only routes */}
           <Route path="/directory"   element={<ProtectedRoute requireApproved><Directory /></ProtectedRoute>} />

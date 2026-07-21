@@ -6,13 +6,13 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
 import {
-  fetchAlumniRoster, fetchRosterCandidates, linkRosterProfile, unlinkRosterProfile,
+  fetchAlumniRoster, fetchRosterCandidates, linkRosterProfile, unlinkRosterProfile, updateRosterRip,
   qk, type RosterEntry, type RosterCandidate,
 } from '../../lib/queries';
 
 const CLASSES = ['3A', '3B', '3C', '3D', '3E', '3F'] as const;
 type ClassTab  = 'all' | typeof CLASSES[number];
-type LinkFilter = 'all' | 'linked' | 'unlinked' | 'suggested';
+type LinkFilter = 'all' | 'linked' | 'unlinked' | 'suggested' | 'deceased';
 
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   hadir:      { label: 'Hadir',      cls: 'bg-green-500/10 text-green-400' },
@@ -60,7 +60,7 @@ function Avatar({ url, name, size = 'md' }: { url: string | null; name: string |
 // ─── Roster row ───────────────────────────────────────────────────────────────
 
 function RosterRow({
-  entry, suggestion, candidatesUnlinked, busy, onLink, onUnlink,
+  entry, suggestion, candidatesUnlinked, busy, onLink, onUnlink, onToggleRip,
 }: {
   entry:               RosterEntry;
   suggestion:          { candidate: RosterCandidate; score: number } | null;
@@ -68,13 +68,18 @@ function RosterRow({
   busy:                boolean;
   onLink:              (rosterId: string, profileId: string) => void;
   onUnlink:            (rosterId: string) => void;
+  onToggleRip:         (rosterId: string, rip: boolean) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [q, setQ] = useState('');
+  const [confirmRip, setConfirmRip] = useState(false);
 
   const displayName = entry.nama_update ?? entry.nama_lengkap;
   const linked = entry.profile;
   const status = entry.status ? STATUS_BADGE[entry.status] : null;
+  const containerCls = entry.rip
+    ? 'border-red-500/15 bg-red-500/[0.02]'
+    : linked ? 'border-green-500/20 bg-green-500/[0.03]' : 'border-white/10';
 
   const searchResults = useMemo(() => {
     if (q.trim().length < 2) return [];
@@ -87,7 +92,7 @@ function RosterRow({
   }, [q, candidatesUnlinked]);
 
   return (
-    <div className={`rounded-xl border transition-colors ${linked ? 'border-green-500/20 bg-green-500/[0.03]' : 'border-white/10'}`}>
+    <div className={`rounded-xl border transition-colors ${containerCls}`}>
       <div className="flex items-center gap-3 px-4 py-3">
         <span className="text-[10px] font-mono text-gray-600 w-6 text-right shrink-0">{entry.absen}</span>
 
@@ -106,43 +111,70 @@ function RosterRow({
           )}
         </div>
 
-        {/* Link state / actions */}
-        {linked ? (
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-1.5 bg-green-500/10 border border-green-500/20 rounded-full pl-1 pr-2.5 py-0.5">
-              <Avatar url={linked.avatar_url} name={linked.name} size="sm" />
-              <span className="text-xs text-green-300 max-w-[120px] truncate">{linked.name ?? '—'}</span>
-            </div>
-            <button onClick={() => onUnlink(entry.id)} disabled={busy} title="Unlink"
-              className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all disabled:opacity-40">
-              <Link2Off size={13} />
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 shrink-0">
-            {suggestion && (
-              <button
-                onClick={() => onLink(entry.id, suggestion.candidate.id)}
-                disabled={busy}
-                title={`Link to ${suggestion.candidate.name} (${Math.round(suggestion.score * 100)}% match)`}
-                className="flex items-center gap-1.5 text-xs font-bold text-gold border border-gold/30 bg-gold/5 pl-1.5 pr-3 py-1 rounded-full hover:bg-gold/15 transition-all disabled:opacity-40 max-w-[190px]"
-              >
-                <Sparkles size={11} className="shrink-0" />
-                <Avatar url={suggestion.candidate.avatar_url} name={suggestion.candidate.name} size="sm" />
-                <span className="truncate">{suggestion.candidate.name}</span>
+        {/* Link state / actions + deceased toggle */}
+        <div className="flex items-center gap-2 shrink-0">
+          {linked ? (
+            <>
+              <div className="flex items-center gap-1.5 bg-green-500/10 border border-green-500/20 rounded-full pl-1 pr-2.5 py-0.5">
+                <Avatar url={linked.avatar_url} name={linked.name} size="sm" />
+                <span className="text-xs text-green-300 max-w-[120px] truncate">{linked.name ?? '—'}</span>
+              </div>
+              <button onClick={() => onUnlink(entry.id)} disabled={busy} title="Unlink"
+                className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all disabled:opacity-40">
+                <Link2Off size={13} />
               </button>
-            )}
+            </>
+          ) : !entry.rip ? (
+            <>
+              {suggestion && (
+                <button
+                  onClick={() => onLink(entry.id, suggestion.candidate.id)}
+                  disabled={busy}
+                  title={`Link to ${suggestion.candidate.name} (${Math.round(suggestion.score * 100)}% match)`}
+                  className="flex items-center gap-1.5 text-xs font-bold text-gold border border-gold/30 bg-gold/5 pl-1.5 pr-3 py-1 rounded-full hover:bg-gold/15 transition-all disabled:opacity-40 max-w-[190px]"
+                >
+                  <Sparkles size={11} className="shrink-0" />
+                  <Avatar url={suggestion.candidate.avatar_url} name={suggestion.candidate.name} size="sm" />
+                  <span className="truncate">{suggestion.candidate.name}</span>
+                </button>
+              )}
+              <button
+                onClick={() => setExpanded(e => !e)}
+                className={`flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-full border transition-all ${
+                  expanded ? 'border-gold/30 text-gold bg-gold/5' : 'border-white/10 text-gray-400 hover:text-white hover:border-white/20'
+                }`}
+              >
+                <Search size={11} /> Search
+                <ChevronDown size={11} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+              </button>
+            </>
+          ) : null}
+
+          {/* Deceased toggle (with inline confirm) */}
+          {confirmRip ? (
+            <div className="flex items-center gap-1 bg-white/5 rounded-lg px-1.5 py-1">
+              <span className="text-[10px] text-gray-300 whitespace-nowrap">{entry.rip ? 'Unmark?' : 'Mark deceased?'}</span>
+              <button onClick={() => { onToggleRip(entry.id, !entry.rip); setConfirmRip(false); }} disabled={busy}
+                title="Confirm" className="text-green-400 hover:text-green-300 disabled:opacity-40">
+                <Check size={13} />
+              </button>
+              <button onClick={() => setConfirmRip(false)} title="Cancel" className="text-gray-500 hover:text-gray-300">
+                <X size={13} />
+              </button>
+            </div>
+          ) : (
             <button
-              onClick={() => setExpanded(e => !e)}
-              className={`flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-full border transition-all ${
-                expanded ? 'border-gold/30 text-gold bg-gold/5' : 'border-white/10 text-gray-400 hover:text-white hover:border-white/20'
+              onClick={() => setConfirmRip(true)}
+              disabled={busy}
+              title={entry.rip ? 'Unmark deceased' : 'Mark as deceased'}
+              className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all disabled:opacity-40 ${
+                entry.rip ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20' : 'text-gray-600 hover:text-red-400 hover:bg-red-500/5'
               }`}
             >
-              <Search size={11} /> Search
-              <ChevronDown size={11} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+              ✝
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Manual search panel */}
@@ -259,6 +291,7 @@ export default function AdminRoster() {
       if (linkFilter === 'linked'    && !r.profile_id) return false;
       if (linkFilter === 'unlinked'  && (r.profile_id || r.rip)) return false;
       if (linkFilter === 'suggested' && !suggestions.has(r.id)) return false;
+      if (linkFilter === 'deceased'  && !r.rip) return false;
       if (needle) {
         const hay = `${r.nama_lengkap} ${r.nama_update ?? ''} ${r.profile?.name ?? ''}`.toLowerCase();
         if (!hay.includes(needle)) return false;
@@ -276,7 +309,15 @@ export default function AdminRoster() {
     mutationFn: (rosterId: string) => unlinkRosterProfile(rosterId, user!.id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.roster() }),
   });
-  const busy = linkMut.isPending || unlinkMut.isPending;
+  const ripMut = useMutation({
+    mutationFn: ({ rosterId, rip }: { rosterId: string; rip: boolean }) =>
+      updateRosterRip(rosterId, rip, user!.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.roster() });
+      queryClient.invalidateQueries({ queryKey: qk.memorials() });  // keep In Memoriam in sync
+    },
+  });
+  const busy = linkMut.isPending || unlinkMut.isPending || ripMut.isPending;
 
   if (roleLoad) return (
     <div className="p-8 min-h-screen flex items-center justify-center text-gray-600 text-sm tracking-widest uppercase animate-pulse">Loading…</div>
@@ -293,9 +334,9 @@ export default function AdminRoster() {
         <p className="text-gray-500 text-sm mt-1">Link the Class of '87 rollcall to registered member accounts.</p>
       </div>
 
-      {(linkMut.error || unlinkMut.error) && (
+      {(linkMut.error || unlinkMut.error || ripMut.error) && (
         <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-          Failed to update link: {((linkMut.error ?? unlinkMut.error) as Error).message}
+          Failed to update: {((linkMut.error ?? unlinkMut.error ?? ripMut.error) as Error).message}
         </div>
       )}
 
@@ -372,7 +413,7 @@ export default function AdminRoster() {
       </div>
 
       <div className="flex gap-1 flex-wrap mb-4">
-        {([['all', 'All'], ['linked', 'Linked'], ['unlinked', 'Not Linked'], ['suggested', 'Suggested']] as [LinkFilter, string][]).map(([f, lbl]) => (
+        {([['all', 'All'], ['linked', 'Linked'], ['unlinked', 'Not Linked'], ['suggested', 'Suggested'], ['deceased', 'Deceased']] as [LinkFilter, string][]).map(([f, lbl]) => (
           <button key={f} onClick={() => setLinkFilter(f)}
             className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
               linkFilter === f ? 'bg-white/10 text-white border border-white/20' : 'text-gray-500 border border-white/5 hover:text-white hover:border-white/15'
@@ -399,6 +440,7 @@ export default function AdminRoster() {
                 busy={busy}
                 onLink={(rosterId, profileId) => linkMut.mutate({ rosterId, profileId })}
                 onUnlink={(rosterId) => unlinkMut.mutate(rosterId)}
+                onToggleRip={(rosterId, rip) => ripMut.mutate({ rosterId, rip })}
               />
             </motion.div>
           ))}
