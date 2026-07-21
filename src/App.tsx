@@ -34,6 +34,7 @@ import ContentAdmin   from './pages/admin/ContentAdmin';
 import SiteCMSAdmin   from './pages/admin/SiteCMSAdmin';
 import AllMembers     from './pages/admin/AllMembers';
 import AdminRoles     from './pages/admin/AdminRoles';
+import AdminRoster    from './pages/admin/AdminRoster';
 import AdminPayments         from './pages/admin/AdminPayments';
 import AdminMerchandise      from './pages/admin/AdminMerchandise';
 import AdminOrders           from './pages/admin/AdminOrders';
@@ -106,6 +107,7 @@ export default function App() {
           <Route path="site-cms"    element={<SiteCMSAdmin />} />
           <Route path="all-members" element={<AllMembers />} />
           <Route path="roles"            element={<AdminRoles />} />
+          <Route path="roster"           element={<AdminRoster />} />
           <Route path="payments"        element={<AdminPayments />} />
           <Route path="merchandise"     element={<AdminMerchandise />} />
           <Route path="orders"          element={<AdminOrders />} />

@@ -61,6 +61,9 @@ export const qk = {
   adminExpenses:     ()                                    => ['admin', 'expenses']                                as const,
   // Media tags (member-added post-upload)
   mediaTags:         (mediaId: string)                     => ['media-tags', mediaId]                             as const,
+  // Alumni roster (master rollcall ↔ account matching)
+  roster:            ()                                    => ['admin', 'roster']                                  as const,
+  rosterCandidates:  ()                                    => ['admin', 'roster', 'candidates']                    as const,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1965,4 +1968,74 @@ export async function fetchKaosReport(
       iuran_paid:   feeTarget > 0 && paid >= feeTarget,
     };
   });
+}
+
+// ─── Alumni roster ↔ account matching ─────────────────────────────────────────
+
+export interface RosterEntry {
+  id:           string;
+  kelas:        string;
+  absen:        number;
+  nama_lengkap: string;
+  nama_update:  string | null;
+  status:       'hadir' | 'belum_tahu' | 'belum_isi' | null;
+  rip:          boolean;
+  profile_id:   string | null;
+  profile:      { id: string; name: string | null; avatar_url: string | null } | null;
+}
+
+export interface RosterCandidate {
+  id:         string;
+  name:       string | null;
+  nickname:   string | null;
+  kelas:      string | null;
+  avatar_url: string | null;
+  city:       string | null;
+}
+
+export async function fetchAlumniRoster(): Promise<RosterEntry[]> {
+  // alumni_roster has two FKs to profiles (profile_id, matched_by) → disambiguate the embed.
+  const { data, error } = await supabase
+    .from('alumni_roster')
+    .select('id, kelas, absen, nama_lengkap, nama_update, status, rip, profile_id, profiles!alumni_roster_profile_id_fkey(id, name, avatar_url)')
+    .order('kelas', { ascending: true })
+    .order('absen', { ascending: true });
+  must(data, error);
+  return (data ?? []).map((r: any) => ({ ...r, profile: r.profiles ?? null })) as RosterEntry[];
+}
+
+export async function fetchRosterCandidates(): Promise<RosterCandidate[]> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, name, nickname, kelas, avatar_url, city')
+    .eq('status', 'approved')
+    .order('name');
+  must(data, error);
+  return (data ?? []) as RosterCandidate[];
+}
+
+export async function linkRosterProfile(rosterId: string, profileId: string, actorId: string): Promise<void> {
+  const { error } = await supabase
+    .from('alumni_roster')
+    .update({ profile_id: profileId, matched_by: actorId, matched_at: new Date().toISOString() })
+    .eq('id', rosterId);
+  if (error) throw error;
+
+  const { error: auditErr } = await supabase.from('audit_log').insert({
+    action: 'roster_linked', actor_id: actorId, target_id: rosterId, details: { profile_id: profileId },
+  });
+  if (auditErr) console.error('[audit_log] insert failed:', auditErr.message, auditErr.details);
+}
+
+export async function unlinkRosterProfile(rosterId: string, actorId: string): Promise<void> {
+  const { error } = await supabase
+    .from('alumni_roster')
+    .update({ profile_id: null, matched_by: null, matched_at: null })
+    .eq('id', rosterId);
+  if (error) throw error;
+
+  const { error: auditErr } = await supabase.from('audit_log').insert({
+    action: 'roster_unlinked', actor_id: actorId, target_id: rosterId, details: {},
+  });
+  if (auditErr) console.error('[audit_log] insert failed:', auditErr.message, auditErr.details);
 }
