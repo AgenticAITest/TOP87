@@ -19,7 +19,7 @@ const superAdminLinks = [
   { to: '/admin/site-cms',    label: 'Site CMS',       icon: PenSquare,     end: false },
   { to: '/admin/content',     label: 'Content',        icon: BookOpen,      end: false },
   { to: '/admin/all-members', label: 'All Members',    icon: Users,         end: false },
-  { to: '/admin/roster',      label: 'Pemetaan Roster',icon: ListChecks,    end: false },
+  { to: '/admin/roster',      label: 'Roster Matching',icon: ListChecks,    end: false },
   { to: '/admin/roles',       label: 'Admin Roles',    icon: ShieldCheck,   end: false },
   { to: '/admin/charters',    label: 'Charters',       icon: Building2,     end: false },
   { to: '/admin/media',       label: 'Media Queue',    icon: Image,         end: false },

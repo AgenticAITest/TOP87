@@ -94,7 +94,7 @@ function RosterRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm text-white truncate">{displayName}</span>
-            {entry.rip && <span className="text-red-400 text-xs shrink-0" title="Almarhum/ah">✝</span>}
+            {entry.rip && <span className="text-red-400 text-xs shrink-0" title="Deceased">✝</span>}
             {status && (
               <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full shrink-0 ${status.cls}`}>
                 {status.label}
@@ -113,7 +113,7 @@ function RosterRow({
               <Avatar url={linked.avatar_url} name={linked.name} size="sm" />
               <span className="text-xs text-green-300 max-w-[120px] truncate">{linked.name ?? '—'}</span>
             </div>
-            <button onClick={() => onUnlink(entry.id)} disabled={busy} title="Putuskan tautan"
+            <button onClick={() => onUnlink(entry.id)} disabled={busy} title="Unlink"
               className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all disabled:opacity-40">
               <Link2Off size={13} />
             </button>
@@ -124,7 +124,7 @@ function RosterRow({
               <button
                 onClick={() => onLink(entry.id, suggestion.candidate.id)}
                 disabled={busy}
-                title={`Tautkan ke ${suggestion.candidate.name} (${Math.round(suggestion.score * 100)}% cocok)`}
+                title={`Link to ${suggestion.candidate.name} (${Math.round(suggestion.score * 100)}% match)`}
                 className="flex items-center gap-1.5 text-xs font-bold text-gold border border-gold/30 bg-gold/5 pl-1.5 pr-3 py-1 rounded-full hover:bg-gold/15 transition-all disabled:opacity-40 max-w-[190px]"
               >
                 <Sparkles size={11} className="shrink-0" />
@@ -138,7 +138,7 @@ function RosterRow({
                 expanded ? 'border-gold/30 text-gold bg-gold/5' : 'border-white/10 text-gray-400 hover:text-white hover:border-white/20'
               }`}
             >
-              <Search size={11} /> Cari
+              <Search size={11} /> Search
               <ChevronDown size={11} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
             </button>
           </div>
@@ -156,16 +156,16 @@ function RosterRow({
                 <input
                   type="text"
                   autoFocus
-                  placeholder="Cari akun terdaftar (nama / panggilan / kota)…"
+                  placeholder="Search registered accounts (name / nickname / city)…"
                   value={q}
                   onChange={e => setQ(e.target.value)}
                   className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-white focus:outline-none focus:border-gold/50"
                 />
               </div>
               {q.trim().length < 2 ? (
-                <p className="text-[11px] text-gray-600 px-1">Ketik minimal 2 huruf.</p>
+                <p className="text-[11px] text-gray-600 px-1">Type at least 2 letters.</p>
               ) : searchResults.length === 0 ? (
-                <p className="text-[11px] text-gray-600 px-1">Tidak ada akun (yang belum tertaut) cocok.</p>
+                <p className="text-[11px] text-gray-600 px-1">No unlinked account matches.</p>
               ) : (
                 <div className="space-y-1">
                   {searchResults.map(c => (
@@ -245,6 +245,7 @@ export default function AdminRoster() {
     const living = roster.filter(r => !r.rip);
     return {
       total:     roster.length,
+      living:    living.length,
       linked:    roster.filter(r => r.profile_id).length,
       unlinked:  living.filter(r => !r.profile_id).length,
       unmapped:  candidatesUnlinked.length,
@@ -282,40 +283,40 @@ export default function AdminRoster() {
   );
   if (!isSuperAdmin) return <Navigate to="/admin" replace />;
 
-  const pct = stats.total > 0 ? Math.round((stats.linked / stats.total) * 100) : 0;
+  const pct = stats.living > 0 ? Math.round((stats.linked / stats.living) * 100) : 0;
 
   return (
     <div className="p-8 min-h-screen max-w-4xl">
       <div className="mb-6">
         <p className="text-xs uppercase tracking-[0.3em] text-gold/60 mb-1">Super Admin</p>
-        <h1 className="font-serif text-4xl font-bold text-white">Pemetaan Roster</h1>
-        <p className="text-gray-500 text-sm mt-1">Tautkan daftar angkatan '87 dengan akun anggota yang sudah mendaftar.</p>
+        <h1 className="font-serif text-4xl font-bold text-white">Roster Matching</h1>
+        <p className="text-gray-500 text-sm mt-1">Link the Class of '87 rollcall to registered member accounts.</p>
       </div>
 
       {(linkMut.error || unlinkMut.error) && (
         <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-          Gagal memperbarui tautan: {((linkMut.error ?? unlinkMut.error) as Error).message}
+          Failed to update link: {((linkMut.error ?? unlinkMut.error) as Error).message}
         </div>
       )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <div className="glass rounded-xl p-4">
-          <p className="text-2xl font-bold font-serif text-green-400">{stats.linked}<span className="text-sm text-gray-600">/{stats.total}</span></p>
-          <p className="text-[10px] uppercase tracking-widest text-gray-500 mt-1">Tertaut ({pct}%)</p>
+          <p className="text-2xl font-bold font-serif text-green-400">{stats.linked}<span className="text-sm text-gray-600">/{stats.living}</span></p>
+          <p className="text-[10px] uppercase tracking-widest text-gray-500 mt-1">Linked ({pct}%)</p>
         </div>
         <div className="glass rounded-xl p-4">
           <p className="text-2xl font-bold font-serif text-yellow-400">{stats.unlinked}</p>
-          <p className="text-[10px] uppercase tracking-widest text-gray-500 mt-1">Belum Tertaut (hidup)</p>
+          <p className="text-[10px] uppercase tracking-widest text-gray-500 mt-1">Not Linked</p>
         </div>
         <div className="glass rounded-xl p-4">
           <p className="text-2xl font-bold font-serif text-sky-400">{suggestions.size}</p>
-          <p className="text-[10px] uppercase tracking-widest text-gray-500 mt-1">Ada Saran</p>
+          <p className="text-[10px] uppercase tracking-widest text-gray-500 mt-1">Suggested</p>
         </div>
         <button onClick={() => setShowUnmapped(s => !s)}
           className={`glass rounded-xl p-4 text-left transition-colors ${showUnmapped ? 'border-gold/30' : 'hover:border-white/15'}`}>
           <p className="text-2xl font-bold font-serif text-purple-400">{stats.unmapped}</p>
-          <p className="text-[10px] uppercase tracking-widest text-gray-500 mt-1">Akun Belum Dipetakan</p>
+          <p className="text-[10px] uppercase tracking-widest text-gray-500 mt-1">Unlinked Accounts</p>
         </button>
       </div>
 
@@ -327,14 +328,14 @@ export default function AdminRoster() {
             <div className="glass rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Users size={14} className="text-purple-400" />
-                <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-purple-300">Akun terdaftar yang belum dipetakan</h2>
+                <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-purple-300">Registered accounts not yet linked</h2>
               </div>
               <p className="text-[11px] text-gray-500 mb-3">
-                Anggota ini sudah punya akun tapi belum ditautkan ke baris roster. Cari namanya di daftar
-                roster di bawah, lalu tautkan dari baris tersebut.
+                These members have an account but aren't linked to a roster row yet. Find their name in
+                the roster list below, then link them from that row.
               </p>
               {candidatesUnlinked.length === 0 ? (
-                <p className="text-sm text-gray-600">Semua akun sudah dipetakan. 🎉</p>
+                <p className="text-sm text-gray-600">All accounts are linked. 🎉</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {candidatesUnlinked.map(c => (
@@ -355,7 +356,7 @@ export default function AdminRoster() {
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
-          <input type="text" placeholder="Cari nama…" value={search} onChange={e => setSearch(e.target.value)}
+          <input type="text" placeholder="Search name…" value={search} onChange={e => setSearch(e.target.value)}
             className="w-full bg-white/5 border border-white/10 rounded-full py-2 pl-10 pr-4 text-sm text-white focus:outline-none focus:border-gold/50 transition-colors" />
         </div>
         <div className="flex gap-1 flex-wrap">
@@ -364,14 +365,14 @@ export default function AdminRoster() {
               className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
                 classTab === c ? 'bg-gold/15 text-gold border border-gold/30' : 'text-gray-500 border border-white/5 hover:text-white hover:border-white/15'
               }`}>
-              {c === 'all' ? 'Semua' : c}
+              {c === 'all' ? 'All' : c}
             </button>
           ))}
         </div>
       </div>
 
       <div className="flex gap-1 flex-wrap mb-4">
-        {([['all', 'Semua'], ['linked', 'Tertaut'], ['unlinked', 'Belum'], ['suggested', 'Ada Saran']] as [LinkFilter, string][]).map(([f, lbl]) => (
+        {([['all', 'All'], ['linked', 'Linked'], ['unlinked', 'Not Linked'], ['suggested', 'Suggested']] as [LinkFilter, string][]).map(([f, lbl]) => (
           <button key={f} onClick={() => setLinkFilter(f)}
             className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
               linkFilter === f ? 'bg-white/10 text-white border border-white/20' : 'text-gray-500 border border-white/5 hover:text-white hover:border-white/15'
@@ -379,14 +380,14 @@ export default function AdminRoster() {
             {lbl}
           </button>
         ))}
-        <span className="ml-auto self-center text-xs text-gray-600">{filtered.length} baris</span>
+        <span className="ml-auto self-center text-xs text-gray-600">{filtered.length} rows</span>
       </div>
 
       {/* Roster list */}
       {rosterLoading || candLoading ? (
         <div className="text-center py-24 text-gray-600 text-sm tracking-widest uppercase animate-pulse">Loading…</div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-24 text-gray-600 text-sm">Tidak ada baris.</div>
+        <div className="text-center py-24 text-gray-600 text-sm">No rows.</div>
       ) : (
         <div className="space-y-2">
           {filtered.map((entry, i) => (
