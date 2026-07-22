@@ -7,17 +7,21 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
 import {
   fetchAlumniRoster, fetchRosterCandidates, linkRosterProfile, unlinkRosterProfile, updateRosterRip,
+  updateRosterStatus,
   qk, type RosterEntry, type RosterCandidate,
 } from '../../lib/queries';
 
 const CLASSES = ['3A', '3B', '3C', '3D', '3E', '3F'] as const;
 type ClassTab  = 'all' | typeof CLASSES[number];
 type LinkFilter = 'all' | 'linked' | 'unlinked' | 'suggested' | 'deceased';
+type RosterStatus = 'hadir' | 'belum_tahu' | 'belum_isi' | null;
 
-const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
-  hadir:      { label: 'Hadir',      cls: 'bg-green-500/10 text-green-400' },
-  belum_tahu: { label: 'Belum Tahu', cls: 'bg-yellow-500/10 text-yellow-400' },
-  belum_isi:  { label: 'Belum Isi',  cls: 'bg-white/5 text-gray-400' },
+// Text/border tint per status for the inline editor.
+const STATUS_SELECT_CLS: Record<string, string> = {
+  hadir:      'text-green-400 border-green-500/30',
+  belum_tahu: 'text-yellow-400 border-yellow-500/30',
+  belum_isi:  'text-red-400 border-red-500/30',
+  '':         'text-gray-400 border-white/10',
 };
 
 // ─── Name matching (roster ↔ account) ─────────────────────────────────────────
@@ -60,7 +64,7 @@ function Avatar({ url, name, size = 'md' }: { url: string | null; name: string |
 // ─── Roster row ───────────────────────────────────────────────────────────────
 
 function RosterRow({
-  entry, suggestion, candidatesUnlinked, busy, onLink, onUnlink, onToggleRip,
+  entry, suggestion, candidatesUnlinked, busy, onLink, onUnlink, onToggleRip, onSetStatus,
 }: {
   entry:               RosterEntry;
   suggestion:          { candidate: RosterCandidate; score: number } | null;
@@ -69,6 +73,7 @@ function RosterRow({
   onLink:              (rosterId: string, profileId: string) => void;
   onUnlink:            (rosterId: string) => void;
   onToggleRip:         (rosterId: string, rip: boolean) => void;
+  onSetStatus:         (rosterId: string, status: RosterStatus) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [q, setQ] = useState('');
@@ -76,7 +81,6 @@ function RosterRow({
 
   const displayName = entry.nama_update ?? entry.nama_lengkap;
   const linked = entry.profile;
-  const status = entry.status ? STATUS_BADGE[entry.status] : null;
   const containerCls = entry.rip
     ? 'border-red-500/15 bg-red-500/[0.02]'
     : linked ? 'border-green-500/20 bg-green-500/[0.03]' : 'border-white/10';
@@ -100,11 +104,17 @@ function RosterRow({
           <div className="flex items-center gap-2">
             <span className="text-sm text-white truncate">{displayName}</span>
             {entry.rip && <span className="text-red-400 text-xs shrink-0" title="Deceased">✝</span>}
-            {status && (
-              <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full shrink-0 ${status.cls}`}>
-                {status.label}
-              </span>
-            )}
+            <select
+              value={entry.status ?? ''}
+              onChange={e => onSetStatus(entry.id, (e.target.value || null) as RosterStatus)}
+              disabled={busy || entry.rip}
+              className={`shrink-0 text-[10px] font-bold uppercase tracking-wider rounded-full pl-2 pr-1 py-0.5 bg-zinc-800 focus:outline-none focus:border-gold/50 disabled:opacity-40 border ${STATUS_SELECT_CLS[entry.status ?? '']}`}
+            >
+              <option value=""           className="bg-zinc-800 text-gray-300">Belum Daftar</option>
+              <option value="hadir"      className="bg-zinc-800 text-gray-300">Hadir</option>
+              <option value="belum_tahu" className="bg-zinc-800 text-gray-300">Belum Tahu</option>
+              <option value="belum_isi"  className="bg-zinc-800 text-gray-300">Belum Isi</option>
+            </select>
           </div>
           {entry.nama_update && (
             <p className="text-[11px] text-gray-600 truncate">roster: {entry.nama_lengkap}</p>
@@ -314,10 +324,19 @@ export default function AdminRoster() {
       updateRosterRip(rosterId, rip, user!.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.roster() });
-      queryClient.invalidateQueries({ queryKey: qk.memorials() });  // keep In Memoriam in sync
+      queryClient.invalidateQueries({ queryKey: qk.memorials() });    // keep In Memoriam in sync
+      queryClient.invalidateQueries({ queryKey: qk.rosterStats() });  // keep dashboard stats in sync
     },
   });
-  const busy = linkMut.isPending || unlinkMut.isPending || ripMut.isPending;
+  const statusMut = useMutation({
+    mutationFn: ({ rosterId, status }: { rosterId: string; status: RosterStatus }) =>
+      updateRosterStatus(rosterId, status, user!.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.roster() });
+      queryClient.invalidateQueries({ queryKey: qk.rosterStats() });
+    },
+  });
+  const busy = linkMut.isPending || unlinkMut.isPending || ripMut.isPending || statusMut.isPending;
 
   if (roleLoad) return (
     <div className="p-8 min-h-screen flex items-center justify-center text-gray-600 text-sm tracking-widest uppercase animate-pulse">Loading…</div>
@@ -334,9 +353,9 @@ export default function AdminRoster() {
         <p className="text-gray-500 text-sm mt-1">Link the Class of '87 rollcall to registered member accounts.</p>
       </div>
 
-      {(linkMut.error || unlinkMut.error || ripMut.error) && (
+      {(linkMut.error || unlinkMut.error || ripMut.error || statusMut.error) && (
         <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-          Failed to update: {((linkMut.error ?? unlinkMut.error ?? ripMut.error) as Error).message}
+          Failed to update: {((linkMut.error ?? unlinkMut.error ?? ripMut.error ?? statusMut.error) as Error).message}
         </div>
       )}
 
@@ -441,6 +460,7 @@ export default function AdminRoster() {
                 onLink={(rosterId, profileId) => linkMut.mutate({ rosterId, profileId })}
                 onUnlink={(rosterId) => unlinkMut.mutate(rosterId)}
                 onToggleRip={(rosterId, rip) => ripMut.mutate({ rosterId, rip })}
+                onSetStatus={(rosterId, status) => statusMut.mutate({ rosterId, status })}
               />
             </motion.div>
           ))}

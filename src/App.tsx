@@ -47,6 +47,7 @@ import PaymentsPage     from './pages/PaymentsPage';
 import MerchandisePage  from './pages/MerchandisePage';
 import MyOrdersPage     from './pages/MyOrdersPage';
 import Memoriam        from './pages/Memoriam';
+import ClassRoster     from './pages/ClassRoster';
 
 function RootRoute() {
   const { user, loading } = useAuth();
@@ -93,6 +94,7 @@ export default function App() {
           <Route path="/submit"      element={<ProtectedRoute requireApproved><SubmitMedia /></ProtectedRoute>} />
           <Route path="/profile"     element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
           <Route path="/members/:id" element={<ProtectedRoute requireApproved><MemberProfile /></ProtectedRoute>} />
+          <Route path="/kehadiran/:kelas" element={<ProtectedRoute requireApproved><ClassRoster /></ProtectedRoute>} />
           <Route path="/payments"     element={<ProtectedRoute requireApproved><PaymentsPage /></ProtectedRoute>} />
           <Route path="/merchandise" element={<ProtectedRoute requireApproved><MerchandisePage /></ProtectedRoute>} />
           <Route path="/orders"      element={<ProtectedRoute requireApproved><MyOrdersPage /></ProtectedRoute>} />

@@ -66,6 +66,9 @@ export const qk = {
   rosterCandidates:  ()                                    => ['admin', 'roster', 'candidates']                    as const,
   // In Memoriam (deceased alumni, safe read via RPC)
   memorials:         ()                                    => ['memorials']                                        as const,
+  // Roster statistics (aggregate counts for the member dashboard)
+  rosterStats:       ()                                    => ['roster-stats']                                     as const,
+  classRoster:       (kelas: string)                       => ['class-roster', kelas]                              as const,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -2042,6 +2045,22 @@ export async function unlinkRosterProfile(rosterId: string, actorId: string): Pr
   if (auditErr) console.error('[audit_log] insert failed:', auditErr.message, auditErr.details);
 }
 
+// Set a roster entry's attendance status (hadir / belum_tahu / belum_isi / null = belum daftar).
+// Super-admin only (RLS). This is what makes the roster the live source for the dashboard stats.
+export async function updateRosterStatus(
+  rosterId: string,
+  status: 'hadir' | 'belum_tahu' | 'belum_isi' | null,
+  actorId: string,
+): Promise<void> {
+  const { error } = await supabase.from('alumni_roster').update({ status }).eq('id', rosterId);
+  if (error) throw error;
+
+  const { error: auditErr } = await supabase.from('audit_log').insert({
+    action: 'roster_status_updated', actor_id: actorId, target_id: rosterId, details: { status },
+  });
+  if (auditErr) console.error('[audit_log] insert failed:', auditErr.message, auditErr.details);
+}
+
 // Mark / unmark a roster entry as deceased (drives the In Memoriam list). Super-admin only (RLS).
 export async function updateRosterRip(rosterId: string, rip: boolean, actorId: string): Promise<void> {
   const { error } = await supabase.from('alumni_roster').update({ rip }).eq('id', rosterId);
@@ -2067,4 +2086,45 @@ export async function fetchMemorials(): Promise<Memorial[]> {
   const { data, error } = await supabase.rpc('list_memorials');
   if (error) throw error;
   return (data ?? []) as Memorial[];
+}
+
+// ─── Roster statistics (member dashboard) ─────────────────────────────────────
+
+export interface RosterStat {
+  kelas:        string;
+  total:        number;
+  hadir:        number;
+  belum_tahu:   number;
+  belum_isi:    number;
+  rip:          number;
+  belum_daftar: number;
+}
+
+// Aggregate per-class counts via the get_roster_stats() SECURITY DEFINER RPC (no PII).
+export async function fetchRosterStats(): Promise<RosterStat[]> {
+  const { data, error } = await supabase.rpc('get_roster_stats');
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    kelas:        r.kelas,
+    total:        Number(r.total),
+    hadir:        Number(r.hadir),
+    belum_tahu:   Number(r.belum_tahu),
+    belum_isi:    Number(r.belum_isi),
+    rip:          Number(r.rip),
+    belum_daftar: Number(r.belum_daftar),
+  }));
+}
+
+export interface ClassRosterMember {
+  nama_lengkap: string;
+  nama_update:  string | null;
+  status:       'hadir' | 'belum_tahu' | 'belum_isi' | null;
+  rip:          boolean;
+}
+
+// Per-class roster (name + status) via list_class_roster() RPC — for the member class-detail page.
+export async function fetchClassRoster(kelas: string): Promise<ClassRosterMember[]> {
+  const { data, error } = await supabase.rpc('list_class_roster', { p_kelas: kelas });
+  if (error) throw error;
+  return (data ?? []) as ClassRosterMember[];
 }

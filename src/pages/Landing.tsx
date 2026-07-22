@@ -8,6 +8,7 @@ import { useDashboardData } from '../hooks/useDashboardData';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { resolveMediaUrl } from '../lib/storage';
 import { qk, fetchSiteSetting, fetchMyKeringanan, submitKeringanan } from '../lib/queries';
+import RosterStatsPanel from '../components/RosterStatsPanel';
 
 // ── Defaults (shown when CMS row not yet created) ─────────────────────────────
 
@@ -397,6 +398,9 @@ export default function Landing() {
           )}
         </div>
       </div>
+
+      {/* ── Statistik Reuni (live roster stats) ──────────────────────────── */}
+      <RosterStatsPanel />
 
       {/* ── Middle Grid ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
