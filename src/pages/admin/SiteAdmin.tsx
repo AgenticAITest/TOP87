@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, type ChangeEvent, ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { Check, Loader, HardDrive, Cloud, Shuffle, List, Search, X, Users, ToggleLeft, ToggleRight, QrCode, FileText, Monitor, Upload, Zap, ExternalLink } from 'lucide-react';
+import { Check, Loader, HardDrive, Cloud, Shuffle, List, Search, X, Users, ToggleLeft, ToggleRight, QrCode, FileText, Monitor, Upload, Zap, ExternalLink, LayoutGrid, ArrowUp, ArrowDown } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { getStorageBackend, setStorageBackend, uploadFile, resolveMediaUrl, type StorageBackend } from '../../lib/storage';
@@ -11,7 +11,9 @@ import {
   fetchQRISConfig, setQRISConfig,
   fetchSiteSetting, setSiteSetting,
   fetchAdminBackdrop, setAdminBackdrop,
-  type FeaturedMode, type FeaturedConfig, type QRISConfig,
+  getDashboardCards, setDashboardCards,
+  DASHBOARD_CARD_IDS, DEFAULT_DASHBOARD_CARDS, DASHBOARD_CARD_COUNT,
+  type FeaturedMode, type FeaturedConfig, type QRISConfig, type DashboardCardId,
   qk,
 } from '../../lib/queries';
 import { getR2WorkerUrl, setR2WorkerUrl } from '../../lib/storage';
@@ -38,6 +40,15 @@ const BACKENDS: { id: StorageBackend; label: string; description: string; icon: 
     icon: <Zap size={20} />,
   },
 ];
+
+// ─── Member dashboard cards ───────────────────────────────────────────────────
+
+const CARD_META: Record<DashboardCardId, { label: string; desc: string }> = {
+  attendance:  { label: 'Kehadiran Alumni',    desc: 'Konfirmasi hadir vs kuota + rincian niat hadir.' },
+  funds:       { label: 'Total Dana Terkumpul', desc: 'Iuran + donasi (+ margin merch) vs target anggaran.' },
+  merchandise: { label: 'Merchandise Terpesan', desc: 'Jumlah item terkonfirmasi + menunggu.' },
+  birthdays:   { label: 'Ulang Tahun Hari Ini', desc: 'Alumni yang berulang tahun hari ini (zona waktu WIB).' },
+};
 
 // ─── Feature flags ────────────────────────────────────────────────────────────
 
@@ -111,6 +122,44 @@ export default function SiteAdmin() {
 
   function toggleFlag(key: keyof FeatureFlags) {
     setLocalFlags({ ...activeFlags, [key]: !activeFlags[key] });
+  }
+
+  // ── Dashboard cards state ──
+  const [cardsSaved, setCardsSaved] = useState(false);
+  const { data: currentCards, isLoading: cardsLoading } = useQuery({
+    queryKey: qk.dashboardCards(),
+    queryFn:  getDashboardCards,
+  });
+  const [localCards, setLocalCards] = useState<DashboardCardId[] | null>(null);
+  const activeCards = localCards ?? currentCards ?? DEFAULT_DASHBOARD_CARDS;
+
+  const cardsMutation = useMutation({
+    mutationFn: () => setDashboardCards(activeCards),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.dashboardCards() });
+      setCardsSaved(true);
+      setTimeout(() => setCardsSaved(false), 2000);
+    },
+  });
+
+  const cardsDirty = localCards !== null &&
+    JSON.stringify(localCards) !== JSON.stringify(currentCards ?? DEFAULT_DASHBOARD_CARDS);
+  const cardsCountOk = activeCards.length === DASHBOARD_CARD_COUNT;
+
+  // Selecting is order-preserving: a newly ticked card lands at the end of the row.
+  function toggleCard(id: DashboardCardId) {
+    setLocalCards(activeCards.includes(id)
+      ? activeCards.filter(c => c !== id)
+      : [...activeCards, id]);
+  }
+
+  function moveCard(id: DashboardCardId, delta: -1 | 1) {
+    const from = activeCards.indexOf(id);
+    const to   = from + delta;
+    if (from < 0 || to < 0 || to >= activeCards.length) return;
+    const next = [...activeCards];
+    [next[from], next[to]] = [next[to], next[from]];
+    setLocalCards(next);
   }
 
   // ── Storage state ──
@@ -441,6 +490,98 @@ export default function SiteAdmin() {
 
           {flagsMutation.isError && (
             <p className="text-red-400 text-xs mt-3">{(flagsMutation.error as Error).message}</p>
+          )}
+        </section>
+
+        {/* ── Member Dashboard Cards ── */}
+        <section className="glass rounded-2xl p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <LayoutGrid size={18} className="text-gold" />
+            <h2 className="text-white font-bold text-lg">Dashboard Cards</h2>
+          </div>
+          <p className="text-gray-500 text-sm mb-6">
+            Pilih tepat {DASHBOARD_CARD_COUNT} kartu yang tampil di dashboard anggota (/home), dan urutannya
+            dari kiri ke kanan.
+          </p>
+
+          {cardsLoading ? (
+            <div className="text-gray-600 text-xs uppercase tracking-widest animate-pulse">Loading…</div>
+          ) : (
+            <>
+              <div className="space-y-2 mb-4">
+                {DASHBOARD_CARD_IDS.map(id => {
+                  const pos = activeCards.indexOf(id);
+                  const on  = pos >= 0;
+                  return (
+                    <div key={id}
+                      className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-colors ${
+                        on ? 'border-gold/30 bg-gold/5' : 'border-white/5 bg-white/[0.02]'}`}>
+                      <button type="button" onClick={() => toggleCard(id)}
+                        className="flex items-center gap-3 text-left flex-grow min-w-0">
+                        {on
+                          ? <ToggleRight size={26} className="text-gold shrink-0" />
+                          : <ToggleLeft  size={26} className="text-gray-600 shrink-0" />}
+                        <span className="min-w-0">
+                          <span className="flex items-center gap-2">
+                            {on && (
+                              <span className="text-[10px] font-bold text-charcoal bg-gold rounded-full w-4 h-4 flex items-center justify-center shrink-0">
+                                {pos + 1}
+                              </span>
+                            )}
+                            <span className={`text-sm font-bold ${on ? 'text-white' : 'text-gray-500'}`}>
+                              {CARD_META[id].label}
+                            </span>
+                          </span>
+                          <span className="block text-xs text-gray-600 mt-0.5">{CARD_META[id].desc}</span>
+                        </span>
+                      </button>
+
+                      {on && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button type="button" onClick={() => moveCard(id, -1)} disabled={pos === 0}
+                            title="Geser ke kiri"
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-gold hover:bg-white/5 disabled:opacity-20 disabled:hover:text-gray-400 disabled:hover:bg-transparent transition-colors">
+                            <ArrowUp size={14} />
+                          </button>
+                          <button type="button" onClick={() => moveCard(id, 1)} disabled={pos === activeCards.length - 1}
+                            title="Geser ke kanan"
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-gold hover:bg-white/5 disabled:opacity-20 disabled:hover:text-gray-400 disabled:hover:bg-transparent transition-colors">
+                            <ArrowDown size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="text-xs text-gray-500 mb-4">
+                Urutan:{' '}
+                {activeCards.length > 0
+                  ? <span className="text-gray-300">{activeCards.map((id, i) => `${i + 1}. ${CARD_META[id].label}`).join('  ·  ')}</span>
+                  : <span className="text-gray-600 italic">belum ada kartu dipilih</span>}
+              </p>
+
+              {!cardsCountOk && (
+                <p className="text-amber-400 text-xs mb-3">
+                  Pilih tepat {DASHBOARD_CARD_COUNT} kartu — saat ini {activeCards.length}.
+                </p>
+              )}
+            </>
+          )}
+
+          <button onClick={() => cardsMutation.mutate()}
+            disabled={cardsMutation.isPending || !cardsDirty || !cardsCountOk}
+            className="flex items-center gap-2 bg-gold hover:bg-gold/90 text-charcoal font-bold py-2.5 px-6 rounded-full transition-all disabled:opacity-40 uppercase tracking-widest text-xs">
+            {cardsMutation.isPending
+              ? <><Loader size={14} className="animate-spin" /> Saving…</>
+              : cardsSaved
+                ? <><Check size={14} /> Saved</>
+                : 'Save'}
+          </button>
+
+          {cardsMutation.isError && (
+            <p className="text-red-400 text-xs mt-3">{(cardsMutation.error as Error).message}</p>
           )}
         </section>
 

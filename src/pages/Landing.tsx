@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Download, ArrowRight, Info, FileText, X } from 'lucide-react';
+import { Download, Info, FileText, X } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { usePageContent } from '../hooks/usePageContent';
@@ -9,6 +9,12 @@ import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { resolveMediaUrl } from '../lib/storage';
 import { qk, fetchSiteSetting, fetchMyKeringanan, submitKeringanan } from '../lib/queries';
 import RosterStatsPanel from '../components/RosterStatsPanel';
+import { useDashboardCards } from '../hooks/useDashboardCards';
+import AttendanceCard   from '../components/dashboard/AttendanceCard';
+import FundsCard        from '../components/dashboard/FundsCard';
+import MerchandiseCard  from '../components/dashboard/MerchandiseCard';
+import BirthdayCard     from '../components/dashboard/BirthdayCard';
+import type { DashboardCardId } from '../lib/queries';
 
 // ── Defaults (shown when CMS row not yet created) ─────────────────────────────
 
@@ -78,6 +84,7 @@ export default function Landing() {
   const { data: pengumumanCms }   = usePageContent('pengumuman');
   const { data: dashboard }   = useDashboardData();
   const { data: flags }       = useFeatureFlags();
+  const { data: selectedCards } = useDashboardCards();
   const { data: flyerUrl = '' } = useQuery({
     queryKey: qk.siteSetting('anggaran_flyer_url'),
     queryFn:  () => fetchSiteSetting('anggaran_flyer_url'),
@@ -112,7 +119,6 @@ export default function Landing() {
                                 : (quotaTarget > 0 ? Math.round(sumAmount / quotaTarget) : 0);
 
   const countdown        = useCountdown(reunionIso);
-  const approvedCount    = dashboard?.approvedCount ?? 0;
   const confirmedCount   = dashboard?.attendance.yes ?? 0;
   const attendancePct    = attendanceTarget > 0 ? Math.min(Math.round((confirmedCount / attendanceTarget) * 100), 100) : 0;
   const minimumMet       = confirmedCount >= quotaTarget;
@@ -152,6 +158,36 @@ export default function Landing() {
       setKeringananForm(f => ({ ...f, contact_number: (profile as any).phone }));
     }
   }, [profile?.id]);
+
+  // KPI card registry — Site Settings picks three of these and their left-to-right order.
+  function renderCard(id: DashboardCardId) {
+    switch (id) {
+      case 'attendance':
+        return (
+          <AttendanceCard
+            confirmedCount={confirmedCount}
+            attendanceTarget={attendanceTarget}
+            attendancePct={attendancePct}
+            quotaTarget={quotaTarget}
+            minimumMet={minimumMet}
+            attendance={dashboard?.attendance}
+            isApproved={isApproved}
+          />
+        );
+      case 'funds':
+        return (
+          <FundsCard
+            totalDana={dashboard?.totalDana}
+            budgetTarget={budgetTargetFromTable}
+            flags={flags}
+          />
+        );
+      case 'merchandise':
+        return <MerchandiseCard totals={dashboard?.merchandiseTotals} flags={flags} />;
+      case 'birthdays':
+        return <BirthdayCard />;
+    }
+  }
 
   const heroStyle = {
     backgroundImage: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('${
@@ -220,183 +256,11 @@ export default function Landing() {
       </section>
 
       {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
+      {/* Which three, and in what order, is admin-configurable in Site Settings. */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-
-        {/* Kehadiran Alumni — live */}
-        <div className="glass-card p-6 rounded-xl shadow-sm">
-          <div className="flex items-center mb-4">
-            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded text-green-700 dark:text-green-400 mr-3">
-              <Users className="w-5 h-5" />
-            </div>
-            <h3 className="font-bold text-gray-800 dark:text-gray-200">Kehadiran Alumni</h3>
-          </div>
-          <div className="flex items-end justify-between mb-2">
-            <div className="flex items-baseline">
-              <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">{confirmedCount}</span>
-              <span className="text-gray-500 dark:text-gray-400 text-lg mx-1">/</span>
-              <span className="text-xl text-gray-500 dark:text-gray-400">{attendanceTarget}</span>
-              <span className="ml-2 text-sm text-gray-400 dark:text-gray-500">Alumni</span>
-            </div>
-            <span className="text-2xl font-bold text-green-600 dark:text-green-400">{attendancePct}%</span>
-          </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-3">
-            <div
-              className="bg-green-600 h-2 rounded-full transition-all"
-              style={{ width: `${attendancePct}%` }}
-            />
-          </div>
-          <p className="text-[11px] text-gray-600 dark:text-gray-400 mb-3">
-            {minimumMet
-              ? `Kuota minimum ${quotaTarget} tercapai ✓ — menuju target ${attendanceTarget}`
-              : `Butuh ${quotaTarget - confirmedCount} lagi untuk kuota minimum (${quotaTarget})`}
-          </p>
-
-          {/* Attendance intent breakdown */}
-          {dashboard?.attendance && (
-            <div className="grid grid-cols-3 gap-1 mb-4 bg-amber-50/60 dark:bg-amber-900/10 rounded-lg p-2 border border-amber-100 dark:border-amber-800/20">
-              <div className="text-center">
-                <p className="text-sm font-bold text-green-700 dark:text-green-400">{dashboard.attendance.yes}</p>
-                <p className="text-[9px] text-gray-500 dark:text-gray-400 leading-tight">Hadir</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{dashboard.attendance.undecided}</p>
-                <p className="text-[9px] text-gray-500 dark:text-gray-400 leading-tight">Belum Tahu</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-bold text-red-500">{dashboard.attendance.no}</p>
-                <p className="text-[9px] text-gray-500 dark:text-gray-400 leading-tight">Tidak Bisa</p>
-              </div>
-            </div>
-          )}
-
-          {isApproved ? (
-            <Link
-              to="/profile"
-              className="w-full py-2 rounded text-sm font-bold flex items-center justify-center gap-2 bg-green-600/80 hover:bg-green-600 text-white transition-colors"
-            >
-              ✓ Sudah Terdaftar
-            </Link>
-          ) : (
-            <Link
-              to="/register"
-              className="btn-primary w-full py-2 rounded text-sm font-bold flex items-center justify-center gap-2"
-            >
-              <ArrowRight className="w-4 h-4" />
-              Daftar Sekarang
-            </Link>
-          )}
-        </div>
-
-        {/* Total Dana Terkumpul */}
-        <div className="glass-card p-6 rounded-xl shadow-sm">
-          <div className="flex items-center mb-4">
-            <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded text-orange-700 dark:text-orange-400 mr-3">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-              </svg>
-            </div>
-            <h3 className="font-bold text-gray-800 dark:text-gray-200">Total Dana Terkumpul</h3>
-          </div>
-          {(() => {
-            const reunionFee  = dashboard?.totalDana?.reunion_fee       ?? 0;
-            const donation    = dashboard?.totalDana?.donation           ?? 0;
-            const merchMargin = dashboard?.totalDana?.merchandise_margin ?? 0;
-            const grandTotal  = flags?.donations
-              ? reunionFee + donation + (flags?.merchandise ? merchMargin : 0)
-              : 0;
-            const danaPct = budgetTargetFromTable > 0
-              ? Math.min(Math.round((grandTotal / budgetTargetFromTable) * 100), 100)
-              : 0;
-            return (
-              <>
-                <div className="flex items-end justify-between mb-2">
-                  <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                    Rp {grandTotal.toLocaleString('id-ID')}
-                  </span>
-                  <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">{danaPct}%</span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-1">
-                  <div
-                    className="h-2 rounded-full transition-all"
-                    style={{ width: `${danaPct}%`, background: 'linear-gradient(to right, #c67119, #a35a12)' }}
-                  />
-                </div>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-3">
-                  dari target Rp {budgetTargetFromTable.toLocaleString('id-ID')}
-                </p>
-                {flags?.donations ? (
-                  <>
-                    <div className="space-y-1 text-[11px] text-gray-500 dark:text-gray-400 mb-4">
-                      <div className="flex justify-between">
-                        <span>Iuran Reuni</span>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Rp {reunionFee.toLocaleString('id-ID')}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Donasi</span>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Rp {donation.toLocaleString('id-ID')}</span>
-                      </div>
-                      {flags?.merchandise && merchMargin > 0 && (
-                        <div className="flex justify-between">
-                          <span>Margin Merchandise</span>
-                          <span className="font-medium text-gray-700 dark:text-gray-300">Rp {merchMargin.toLocaleString('id-ID')}</span>
-                        </div>
-                      )}
-                    </div>
-                    <Link to="/payments" className="btn-primary w-full py-2 rounded text-sm font-bold flex items-center justify-center gap-2">
-                      Bayar Sekarang
-                    </Link>
-                  </>
-                ) : (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 italic">
-                    Pembayaran belum dibuka. Fitur akan aktif segera.
-                  </p>
-                )}
-              </>
-            );
-          })()}
-        </div>
-
-        {/* Merchandise Terpesan */}
-        <div className="glass-card p-6 rounded-xl shadow-sm">
-          <div className="flex items-center mb-4">
-            <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded text-yellow-700 dark:text-yellow-400 mr-3">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-              </svg>
-            </div>
-            <h3 className="font-bold text-gray-800 dark:text-gray-200">Merchandise Terpesan</h3>
-          </div>
-          {flags?.merchandise ? (
-            <>
-              <p className="text-3xl font-bold font-serif text-gray-900 dark:text-gray-100 mb-1">
-                {dashboard?.merchandiseTotals?.confirmed ?? 0}
-                <span className="text-base font-normal text-gray-500 dark:text-gray-400 ml-1">item</span>
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                terkonfirmasi
-                {(dashboard?.merchandiseTotals?.pending ?? 0) > 0 && (
-                  <span className="ml-2 text-yellow-600 dark:text-yellow-400">
-                    · {dashboard!.merchandiseTotals.pending} menunggu
-                  </span>
-                )}
-              </p>
-              <Link
-                to="/merchandise"
-                className="btn-primary w-full py-2 rounded text-sm font-bold flex items-center justify-center gap-2"
-              >
-                Lihat Katalog
-              </Link>
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-gray-400 dark:text-gray-500 italic">Merchandise belum tersedia.</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">Katalog merchandise akan segera hadir.</p>
-              <div className="pt-3 border-t border-amber-100 dark:border-amber-800/20 mt-8">
-                <p className="text-[11px] text-gray-400 dark:text-gray-500 italic">Fitur aktif di fase berikutnya.</p>
-              </div>
-            </>
-          )}
-        </div>
+        {selectedCards.map(id => (
+          <div key={id}>{renderCard(id)}</div>
+        ))}
       </div>
 
       {/* ── Statistik Reuni (live roster stats) ──────────────────────────── */}

@@ -69,6 +69,10 @@ export const qk = {
   // Roster statistics (aggregate counts for the member dashboard)
   rosterStats:       ()                                    => ['roster-stats']                                     as const,
   classRoster:       (kelas: string)                       => ['class-roster', kelas]                              as const,
+  // Birthdays (today's birthday alumni, safe read via RPC)
+  birthdaysToday:    ()                                    => ['birthdays', 'today']                               as const,
+  // Member dashboard card selection + order
+  dashboardCards:    ()                                    => ['site_settings', 'dashboard_cards']                 as const,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -2127,4 +2131,78 @@ export async function fetchClassRoster(kelas: string): Promise<ClassRosterMember
   const { data, error } = await supabase.rpc('list_class_roster', { p_kelas: kelas });
   if (error) throw error;
   return (data ?? []) as ClassRosterMember[];
+}
+
+// ─── Birthdays (member dashboard card) ────────────────────────────────────────
+
+export interface BirthdayPerson {
+  nama:       string;
+  kelas:      string;
+  age:        number;
+  profile_id: string | null;
+  avatar_url: string | null;
+}
+
+// Alumni whose birthday falls on today's date in Asia/Jakarta, via the get_birthdays_today() RPC.
+// Covers all 260 living alumni (registered or not) — the roster is the source, not profiles.
+export async function fetchBirthdaysToday(): Promise<BirthdayPerson[]> {
+  const { data, error } = await supabase.rpc('get_birthdays_today');
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    nama:       r.nama,
+    kelas:      r.kelas,
+    age:        Number(r.age),
+    profile_id: r.profile_id ?? null,
+    avatar_url: r.avatar_url ?? null,
+  }));
+}
+
+// ─── Member dashboard card selection ──────────────────────────────────────────
+
+export type DashboardCardId = 'attendance' | 'funds' | 'merchandise' | 'birthdays';
+
+export const DASHBOARD_CARD_IDS: DashboardCardId[] = ['attendance', 'funds', 'merchandise', 'birthdays'];
+
+// The three cards shown before this setting existed — the default when the row is absent, so the
+// dashboard is unchanged until an admin saves a selection.
+export const DEFAULT_DASHBOARD_CARDS: DashboardCardId[] = ['attendance', 'funds', 'merchandise'];
+
+export const DASHBOARD_CARD_COUNT = 3;
+
+function parseDashboardCards(raw: string | null | undefined): DashboardCardId[] {
+  if (!raw) return DEFAULT_DASHBOARD_CARDS;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return DEFAULT_DASHBOARD_CARDS;
+    // Drop anything unrecognised or duplicated, so a hand-edited row cannot break the dashboard.
+    const ids: DashboardCardId[] = [];
+    for (const id of parsed) {
+      if (typeof id !== 'string') continue;
+      if (!(DASHBOARD_CARD_IDS as string[]).includes(id)) continue;
+      if (ids.includes(id as DashboardCardId)) continue;
+      ids.push(id as DashboardCardId);
+    }
+    return ids.length === DASHBOARD_CARD_COUNT ? ids : DEFAULT_DASHBOARD_CARDS;
+  } catch {
+    return DEFAULT_DASHBOARD_CARDS;
+  }
+}
+
+export async function getDashboardCards(): Promise<DashboardCardId[]> {
+  const { data } = await supabase
+    .from('site_settings')
+    .select('value')
+    .eq('key', 'dashboard_cards')
+    .maybeSingle();
+  return parseDashboardCards(data?.value);
+}
+
+export async function setDashboardCards(ids: DashboardCardId[]): Promise<void> {
+  if (ids.length !== DASHBOARD_CARD_COUNT) {
+    throw new Error(`Pilih tepat ${DASHBOARD_CARD_COUNT} kartu (saat ini ${ids.length}).`);
+  }
+  const { error } = await supabase
+    .from('site_settings')
+    .upsert({ key: 'dashboard_cards', value: JSON.stringify(ids) }, { onConflict: 'key' });
+  if (error) throw error;
 }
