@@ -62,7 +62,7 @@ export default function BirthdayCard() {
                   {p.nama}
                 </p>
                 <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                  {p.kelas} · HUT ke-{p.age}
+                  Kelas: {p.kelas}
                 </p>
               </div>
             </div>
