@@ -1979,6 +1979,109 @@ export async function fetchKaosReport(
   });
 }
 
+// ─── Member payment export (CSV) ──────────────────────────────────────────────
+
+export interface MemberExportRow {
+  kelas:       string;
+  nama:        string;
+  registered:  'Y' | 'N' | 'Deceased';
+  iuranPaid:   number;
+  donation:    number;
+  tshirtSize:  string | null;
+}
+
+// Full-class export for the Pembayaran CSV download: every alumni_roster entry (registered or
+// not), plus any approved account not yet linked to the roster so no paid money goes missing.
+// Amounts use the unified allocation-aware rule (same as Rekap / fetchFundTotals):
+//   iuran    = iuran ledger allocations + confirmed reunion_fee payments not yet allocated
+//   donation = donation-pool allocations (by payer) + confirmed donation payments not yet allocated
+// Super-admin only (alumni_roster RLS + full ledger read).
+export async function fetchMemberPaymentExport(): Promise<MemberExportRow[]> {
+  const [
+    { data: roster, error: rErr },
+    { data: profiles, error: pErr },
+    { data: iuranTxns },
+    { data: donTxns },
+    { data: pays },
+  ] = await Promise.all([
+    supabase.from('alumni_roster').select('kelas, nama_lengkap, nama_update, rip, profile_id'),
+    supabase.from('profiles').select('id, name, kelas, status, tshirt_size'),
+    supabase.from('account_transactions')
+      .select('amount, payment_id, member_accounts!inner(account_type, profile_id)')
+      .eq('member_accounts.account_type', 'iuran')
+      .not('member_accounts.profile_id', 'is', null),
+    supabase.from('account_transactions')
+      .select('amount, payment_id, member_accounts!inner(account_type, profile_id), payments!inner(profile_id, status)')
+      .eq('member_accounts.account_type', 'donation')
+      .is('member_accounts.profile_id', null)
+      .in('payments.status', COUNTED_PAYMENT_STATUSES),
+    supabase.from('payments')
+      .select('id, profile_id, type, member_amount, admin_adjusted_amount')
+      .in('status', COUNTED_PAYMENT_STATUSES),
+  ]);
+  if (rErr) throw rErr;
+  if (pErr) throw pErr;
+
+  const iuranBy = new Map<string, number>();
+  const donBy   = new Map<string, number>();
+  const add = (m: Map<string, number>, id: string, amt: number) => m.set(id, (m.get(id) ?? 0) + amt);
+  const allocated = new Set<string>();
+
+  for (const t of iuranTxns ?? []) {
+    add(iuranBy, (t as any).member_accounts.profile_id, t.amount as number);
+    if ((t as any).payment_id) allocated.add((t as any).payment_id);
+  }
+  for (const t of donTxns ?? []) {
+    const payer = (t as any).payments?.profile_id;
+    if (payer) add(donBy, payer, t.amount as number);
+    if ((t as any).payment_id) allocated.add((t as any).payment_id);
+  }
+  for (const p of pays ?? []) {
+    if (allocated.has((p as any).id)) continue;
+    const amt = ((p as any).admin_adjusted_amount ?? (p as any).member_amount) as number;
+    if (p.type === 'reunion_fee')   add(iuranBy, p.profile_id, amt);
+    else if (p.type === 'donation') add(donBy,   p.profile_id, amt);
+  }
+
+  const profileById = new Map((profiles ?? []).map((p: any) => [p.id as string, p]));
+  const linked = new Set<string>();
+  const rows: MemberExportRow[] = [];
+
+  for (const r of roster ?? []) {
+    const pid = r.profile_id as string | null;
+    if (pid) linked.add(pid);
+    rows.push({
+      kelas:      r.kelas,
+      nama:       r.nama_update || r.nama_lengkap,
+      registered: r.rip ? 'Deceased' : pid ? 'Y' : 'N',
+      iuranPaid:  pid ? iuranBy.get(pid) ?? 0 : 0,
+      donation:   pid ? donBy.get(pid)   ?? 0 : 0,
+      tshirtSize: pid ? profileById.get(pid)?.tshirt_size ?? null : null,
+    });
+  }
+
+  // Accounts not matched to the roster yet: include approved ones and anyone with money recorded.
+  for (const p of profiles ?? []) {
+    if (linked.has(p.id)) continue;
+    const iuran = iuranBy.get(p.id) ?? 0;
+    const don   = donBy.get(p.id)   ?? 0;
+    if (p.status !== 'approved' && iuran === 0 && don === 0) continue;
+    rows.push({
+      kelas:      p.kelas ?? '',
+      nama:       p.name ?? '',
+      registered: 'Y',
+      iuranPaid:  iuran,
+      donation:   don,
+      tshirtSize: p.tshirt_size ?? null,
+    });
+  }
+
+  // Kelas, then name A–Z; accounts with no kelas go last.
+  return rows.sort((a, b) =>
+    (a.kelas || '~').localeCompare(b.kelas || '~') ||
+    a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' }));
+}
+
 // ─── Alumni roster ↔ account matching ─────────────────────────────────────────
 
 export interface RosterEntry {

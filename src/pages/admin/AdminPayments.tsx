@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Search, Check, X, ExternalLink, Loader, ChevronDown, UserCheck, Plus, List, BarChart2, Shirt } from 'lucide-react';
+import { Search, Check, X, ExternalLink, Loader, ChevronDown, UserCheck, Plus, List, BarChart2, Shirt, Download } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
@@ -8,7 +8,7 @@ import {
   fetchAdminPayments, updatePaymentAdmin, adminCreatePayment,
   fetchApprovedMembers, fetchPaymentSummaryReport,
   fetchPaymentAllocations, savePaymentAllocations,
-  fetchKaosReport, fetchFundTotals,
+  fetchKaosReport, fetchFundTotals, fetchMemberPaymentExport,
   qk, type Payment, type MemberPaymentSummary, type LedgerAllocation, type AccountType, type KaosRow,
 } from '../../lib/queries';
 
@@ -910,12 +910,63 @@ export default function AdminPayments() {
     [payments],
   );
 
+  // Full-class CSV (every roster alumnus, registered or not) — always fetched fresh on click.
+  const [exporting,   setExporting]   = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const handleExport = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const rows = await fetchMemberPaymentExport();
+      // Indonesian Excel conventions: ';' column separator, '.' thousands, ',' decimals.
+      const num  = (n: number) => n.toLocaleString('id-ID', { maximumFractionDigits: 2 });
+      const esc  = (s: string | null) => {
+        const v = s ?? '';
+        return /[";\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+      };
+      const lines = [
+        ['Kelas', 'Nama', 'Registered', 'Total Dibayar', 'Iuran', 'Donasi', 'Ukuran Kaos'],
+        ...rows.map(r => [
+          r.kelas, r.nama, r.registered,
+          num(r.iuranPaid + r.donation), num(r.iuranPaid), num(r.donation),
+          r.tshirtSize,
+        ]),
+      ].map(cols => cols.map(esc).join(';'));
+      // BOM so Excel reads UTF-8 names correctly.
+      const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `pembayaran-anggota-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setExportError(e?.message ?? 'Gagal mengunduh data.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="p-8 min-h-screen">
-      <div className="mb-6">
-        <p className="text-xs uppercase tracking-[0.3em] text-gold/60 mb-1">Admin</p>
-        <h1 className="font-serif text-4xl font-bold text-white">Pembayaran</h1>
-        <p className="text-gray-500 text-sm mt-1">Rekonsiliasi iuran reuni dan donasi.</p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-end gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-gold/60 mb-1">Admin</p>
+          <h1 className="font-serif text-4xl font-bold text-white">Pembayaran</h1>
+          <p className="text-gray-500 text-sm mt-1">Rekonsiliasi iuran reuni dan donasi.</p>
+        </div>
+        {isSuperAdmin && (
+          <div className="sm:ml-auto flex flex-col items-start sm:items-end gap-1">
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider bg-gold/15 text-gold border border-gold/30 hover:bg-gold/25 transition-all disabled:opacity-50"
+            >
+              {exporting ? <Loader size={13} className="animate-spin" /> : <Download size={13} />} Download CSV
+            </button>
+            {exportError && <p className="text-xs text-red-400">{exportError}</p>}
+          </div>
+        )}
       </div>
 
       {/* Stat cards */}
