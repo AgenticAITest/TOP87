@@ -2092,8 +2092,24 @@ export interface RosterEntry {
   nama_update:  string | null;
   status:       'hadir' | 'belum_tahu' | 'belum_isi' | null;
   rip:          boolean;
+  birthdate:    string | null;
+  notes:        string | null;
   profile_id:   string | null;
-  profile:      { id: string; name: string | null; avatar_url: string | null } | null;
+  profile:      RosterLinkedProfile | null;
+}
+
+// Linked account fields — the avatar for display plus everything the admin edit modal can correct.
+export interface RosterLinkedProfile {
+  id:          string;
+  name:        string | null;
+  avatar_url:  string | null;
+  nickname:    string | null;
+  kelas:       string | null;
+  whatsapp:    string | null;
+  phone:       string | null;
+  city:        string | null;
+  profession:  string | null;
+  tshirt_size: string | null;
 }
 
 export interface RosterCandidate {
@@ -2109,7 +2125,7 @@ export async function fetchAlumniRoster(): Promise<RosterEntry[]> {
   // alumni_roster has two FKs to profiles (profile_id, matched_by) → disambiguate the embed.
   const { data, error } = await supabase
     .from('alumni_roster')
-    .select('id, kelas, absen, nama_lengkap, nama_update, status, rip, profile_id, profiles!alumni_roster_profile_id_fkey(id, name, avatar_url)')
+    .select('id, kelas, absen, nama_lengkap, nama_update, status, rip, birthdate, notes, profile_id, profiles!alumni_roster_profile_id_fkey(id, name, avatar_url, nickname, kelas, whatsapp, phone, city, profession, tshirt_size)')
     .order('kelas', { ascending: true })
     .order('absen', { ascending: true });
   must(data, error);
@@ -2166,6 +2182,40 @@ export async function updateRosterStatus(
     action: 'roster_status_updated', actor_id: actorId, target_id: rosterId, details: { status },
   });
   if (auditErr) console.error('[audit_log] insert failed:', auditErr.message, auditErr.details);
+}
+
+// Correct a member's detail data (typos etc.). Updates the roster row and, when linked, the
+// account's profile in one transaction via the admin_update_member() RPC, which also writes the
+// audit_log entry. Super-admin only (checked inside the RPC). Empty strings are stored as NULL.
+export interface MemberDetailsInput {
+  nama_lengkap: string;
+  nama_update:  string;
+  birthdate:    string;   // 'YYYY-MM-DD' or '' — written to both roster and profile
+  notes:        string;
+  profile?: {             // only for a linked account
+    name: string; nickname: string; kelas: string; whatsapp: string; phone: string;
+    city: string; profession: string; tshirt_size: string;
+  };
+}
+
+export async function updateMemberDetails(rosterId: string, input: MemberDetailsInput): Promise<void> {
+  const p = input.profile;
+  const { error } = await supabase.rpc('admin_update_member', {
+    p_roster_id:    rosterId,
+    p_nama_lengkap: input.nama_lengkap,
+    p_nama_update:  input.nama_update,
+    p_birthdate:    input.birthdate || null,
+    p_notes:        input.notes,
+    p_name:         p?.name        ?? null,
+    p_nickname:     p?.nickname    ?? null,
+    p_kelas:        p?.kelas       ?? null,
+    p_whatsapp:     p?.whatsapp    ?? null,
+    p_phone:        p?.phone       ?? null,
+    p_city:         p?.city        ?? null,
+    p_profession:   p?.profession  ?? null,
+    p_tshirt_size:  p?.tshirt_size ?? null,
+  });
+  if (error) throw error;
 }
 
 // Mark / unmark a roster entry as deceased (drives the In Memoriam list). Super-admin only (RLS).

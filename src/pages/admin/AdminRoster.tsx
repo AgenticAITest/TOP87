@@ -1,17 +1,18 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactNode, type ChangeEvent, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, X, Loader, Link2, Link2Off, Check, Sparkles, ChevronDown, Users } from 'lucide-react';
+import { Search, X, Loader, Link2, Link2Off, Check, Sparkles, ChevronDown, Users, Pencil } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
 import {
   fetchAlumniRoster, fetchRosterCandidates, linkRosterProfile, unlinkRosterProfile, updateRosterRip,
-  updateRosterStatus,
-  qk, type RosterEntry, type RosterCandidate,
+  updateRosterStatus, updateMemberDetails,
+  qk, type RosterEntry, type RosterCandidate, type MemberDetailsInput,
 } from '../../lib/queries';
 
 const CLASSES = ['3A', '3B', '3C', '3D', '3E', '3F'] as const;
+const TSHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'] as const;
 type ClassTab  = 'all' | typeof CLASSES[number];
 type LinkFilter = 'all' | 'linked' | 'unlinked' | 'suggested' | 'deceased';
 type RosterStatus = 'hadir' | 'belum_tahu' | 'belum_isi' | null;
@@ -64,7 +65,7 @@ function Avatar({ url, name, size = 'md' }: { url: string | null; name: string |
 // ─── Roster row ───────────────────────────────────────────────────────────────
 
 function RosterRow({
-  entry, suggestion, candidatesUnlinked, busy, onLink, onUnlink, onToggleRip, onSetStatus,
+  entry, suggestion, candidatesUnlinked, busy, onLink, onUnlink, onToggleRip, onSetStatus, onEdit,
 }: {
   entry:               RosterEntry;
   suggestion:          { candidate: RosterCandidate; score: number } | null;
@@ -74,6 +75,7 @@ function RosterRow({
   onUnlink:            (rosterId: string) => void;
   onToggleRip:         (rosterId: string, rip: boolean) => void;
   onSetStatus:         (rosterId: string, status: RosterStatus) => void;
+  onEdit:              (entry: RosterEntry) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [q, setQ] = useState('');
@@ -160,6 +162,11 @@ function RosterRow({
             </>
           ) : null}
 
+          <button onClick={() => onEdit(entry)} disabled={busy} title="Edit details"
+            className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:text-gold hover:bg-gold/5 transition-all disabled:opacity-40">
+            <Pencil size={13} />
+          </button>
+
           {/* Deceased toggle (with inline confirm) */}
           {confirmRip ? (
             <div className="flex items-center gap-1 bg-white/5 rounded-lg px-1.5 py-1">
@@ -235,6 +242,161 @@ function RosterRow({
   );
 }
 
+// ─── Edit details modal ───────────────────────────────────────────────────────
+// Corrects typos in collected data. Saves the roster row and, when linked, the account's profile
+// together (admin_update_member RPC). Date of birth is one field written to both.
+
+const inputCls = 'w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold/50';
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">{label}</span>
+      {children}
+      {hint && <span className="block text-[10px] text-gray-600 mt-1">{hint}</span>}
+    </label>
+  );
+}
+
+function EditMemberModal({
+  entry, saving, error, onSave, onClose,
+}: {
+  entry:   RosterEntry;
+  saving:  boolean;
+  error:   Error | null;
+  onSave:  (input: MemberDetailsInput) => void;
+  onClose: () => void;
+}) {
+  const linked = entry.profile;
+  const [form, setForm] = useState({
+    nama_lengkap: entry.nama_lengkap,
+    nama_update:  entry.nama_update ?? '',
+    birthdate:    entry.birthdate ?? '',
+    notes:        entry.notes ?? '',
+    name:         linked?.name ?? '',
+    nickname:     linked?.nickname ?? '',
+    kelas:        linked?.kelas ?? '',
+    whatsapp:     linked?.whatsapp ?? '',
+    phone:        linked?.phone ?? '',
+    city:         linked?.city ?? '',
+    profession:   linked?.profession ?? '',
+    tshirt_size:  linked?.tshirt_size ?? '',
+  });
+  const set = (k: keyof typeof form) =>
+    (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+      setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const canSave = form.nama_lengkap.trim() !== '' && (!linked || form.name.trim() !== '');
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!canSave) return;
+    onSave({
+      nama_lengkap: form.nama_lengkap,
+      nama_update:  form.nama_update,
+      birthdate:    form.birthdate,
+      notes:        form.notes,
+      profile: linked ? {
+        name: form.name, nickname: form.nickname, kelas: form.kelas, whatsapp: form.whatsapp,
+        phone: form.phone, city: form.city, profession: form.profession, tshirt_size: form.tshirt_size,
+      } : undefined,
+    });
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      onClick={onClose}>
+      <motion.form initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 12, opacity: 0 }}
+        onClick={e => e.stopPropagation()} onSubmit={submit}
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-zinc-900 p-6">
+        <div className="flex items-start justify-between mb-5">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.3em] text-gold/60">{entry.kelas} · #{entry.absen}</p>
+            <h2 className="font-serif text-2xl font-bold text-white">Edit Details</h2>
+          </div>
+          <button type="button" onClick={onClose} className="text-gray-500 hover:text-white"><X size={18} /></button>
+        </div>
+
+        <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-gold mb-3">Roster</h3>
+        <div className="space-y-3 mb-6">
+          <Field label="Nama lengkap (roster 1987)">
+            <input className={inputCls} value={form.nama_lengkap} onChange={set('nama_lengkap')} required />
+          </Field>
+          <Field label="Nama sekarang" hint="Kosongkan jika sama dengan nama di roster.">
+            <input className={inputCls} value={form.nama_update} onChange={set('nama_update')} />
+          </Field>
+          <Field label="Tanggal lahir" hint={linked ? 'Disimpan ke roster dan akun anggota.' : undefined}>
+            <input type="date" className={inputCls} value={form.birthdate} onChange={set('birthdate')} />
+          </Field>
+          <Field label="Catatan (internal)">
+            <textarea rows={2} className={inputCls} value={form.notes} onChange={set('notes')} />
+          </Field>
+        </div>
+
+        {linked ? (
+          <>
+            <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-gold mb-3">Akun Anggota</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+              <div className="sm:col-span-2">
+                <Field label="Nama (akun)">
+                  <input className={inputCls} value={form.name} onChange={set('name')} required />
+                </Field>
+              </div>
+              <Field label="Nama panggilan">
+                <input className={inputCls} value={form.nickname} onChange={set('nickname')} />
+              </Field>
+              <Field label="Kelas">
+                <select className={inputCls} value={form.kelas} onChange={set('kelas')}>
+                  <option value="" className="bg-zinc-800">—</option>
+                  {CLASSES.map(c => <option key={c} value={c} className="bg-zinc-800">{c}</option>)}
+                </select>
+              </Field>
+              <Field label="WhatsApp">
+                <input className={inputCls} value={form.whatsapp} onChange={set('whatsapp')} />
+              </Field>
+              <Field label="Telepon">
+                <input className={inputCls} value={form.phone} onChange={set('phone')} />
+              </Field>
+              <Field label="Kota">
+                <input className={inputCls} value={form.city} onChange={set('city')} />
+              </Field>
+              <Field label="Profesi">
+                <input className={inputCls} value={form.profession} onChange={set('profession')} />
+              </Field>
+              <Field label="Ukuran kaos">
+                <select className={inputCls} value={form.tshirt_size} onChange={set('tshirt_size')}>
+                  <option value="" className="bg-zinc-800">—</option>
+                  {TSHIRT_SIZES.map(sz => <option key={sz} value={sz} className="bg-zinc-800">{sz}</option>)}
+                </select>
+              </Field>
+            </div>
+          </>
+        ) : (
+          <p className="text-[11px] text-gray-600 mb-6">Belum terdaftar — hanya data roster yang bisa diubah.</p>
+        )}
+
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+            Gagal menyimpan: {error.message}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose}
+            className="px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider text-gray-400 border border-white/10 hover:text-white">
+            Batal
+          </button>
+          <button type="submit" disabled={!canSave || saving}
+            className="flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider bg-gold text-black hover:opacity-90 disabled:opacity-40">
+            {saving && <Loader size={12} className="animate-spin" />} Simpan
+          </button>
+        </div>
+      </motion.form>
+    </motion.div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminRoster() {
@@ -246,6 +408,7 @@ export default function AdminRoster() {
   const [linkFilter, setLinkFilter] = useState<LinkFilter>('all');
   const [search,    setSearch]    = useState('');
   const [showUnmapped, setShowUnmapped] = useState(false);
+  const [editing,   setEditing]   = useState<RosterEntry | null>(null);
 
   const { data: roster = [],     isLoading: rosterLoading } = useQuery({ queryKey: qk.roster(),           queryFn: fetchAlumniRoster });
   const { data: candidates = [], isLoading: candLoading }   = useQuery({ queryKey: qk.rosterCandidates(), queryFn: fetchRosterCandidates });
@@ -334,6 +497,16 @@ export default function AdminRoster() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.roster() });
       queryClient.invalidateQueries({ queryKey: qk.rosterStats() });
+    },
+  });
+  const editMut = useMutation({
+    mutationFn: ({ rosterId, input }: { rosterId: string; input: MemberDetailsInput }) =>
+      updateMemberDetails(rosterId, input),
+    onSuccess: () => {
+      setEditing(null);
+      // Names/DOB/profile fields show up all over (directory, class roster, birthdays, admin lists)
+      // and edits are rare — refetch everything rather than chase every key.
+      queryClient.invalidateQueries();
     },
   });
   const busy = linkMut.isPending || unlinkMut.isPending || ripMut.isPending || statusMut.isPending;
@@ -461,11 +634,24 @@ export default function AdminRoster() {
                 onUnlink={(rosterId) => unlinkMut.mutate(rosterId)}
                 onToggleRip={(rosterId, rip) => ripMut.mutate({ rosterId, rip })}
                 onSetStatus={(rosterId, status) => statusMut.mutate({ rosterId, status })}
+                onEdit={(e) => { editMut.reset(); setEditing(e); }}
               />
             </motion.div>
           ))}
         </div>
       )}
+
+      <AnimatePresence>
+        {editing && (
+          <EditMemberModal
+            entry={editing}
+            saving={editMut.isPending}
+            error={editMut.error as Error | null}
+            onSave={(input) => editMut.mutate({ rosterId: editing.id, input })}
+            onClose={() => setEditing(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
