@@ -100,8 +100,10 @@ BEGIN
       INTO v_prof_after;
   END IF;
 
+  -- No ::text cast: prod's audit_log.target_id is uuid (the table predates the migration that
+  -- declares it text). A bare uuid assigns cleanly to either column type.
   INSERT INTO audit_log (action, actor_id, target_id, details)
-  VALUES ('member_details_updated', auth.uid(), p_roster_id::text, jsonb_build_object(
+  VALUES ('member_details_updated', auth.uid(), p_roster_id, jsonb_build_object(
     'profile_id',     v_profile_id,
     'roster_before',  v_roster_before,
     'roster_after',   v_roster_after,
